@@ -1,0 +1,17 @@
+{
+  "name": "api-problem-basex",
+  "version": "0.2.0",
+  "description": "JS tests for api-problem xqm for BaseX",
+  "main": "node_modules/.bin/_mocha",
+  "scripts": {
+    "test": "node_modules/.bin/_mocha"
+  },
+  "author": "Omar Siam",
+  "license": "MIT",
+  "dependencies": {
+    "chai": "^4.1.2",
+    "chai-as-promised": "^7.1.1",
+    "mocha": "^4.0.1",
+    "supertest": "^3.0.0"
+  }
+}
