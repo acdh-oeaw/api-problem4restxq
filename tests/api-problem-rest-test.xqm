@@ -11,18 +11,18 @@ declare
   %rest:path('tests/test1')
   %rest:GET
 function _:test1() {
-  api-problem:or_result(_:error-out#3, [' Test1', ' Test2', ' Test3'])
+  api-problem:or_result(prof:current-ns(), _:error-out#3, [' Test1', ' Test2', ' Test3'])
 };
 
 declare %private function _:error-out($param1, $param2, $param3) {
-    error(xs:QName('_:an-error'), 'testError'||$param1||$param2||$param3, <test><_>{$param1}</_><_>{$param2}</_><_>{$param3}</_></test>)
+    error( xs:QName('_:an-error'), 'testError'||$param1||$param2||$param3, <test><_>{$param1}</_><_>{$param2}</_><_>{$param3}</_></test>)
 };
 
 declare
   %rest:path('tests/test2')
   %rest:GET
 function _:test2() {
-   api-problem:or_result(_:create-test-data#3, [' Test1', ' Test2', ' Test3'])
+   api-problem:or_result(prof:current-ns(), _:create-test-data#3, [' Test1', ' Test2', ' Test3'])
 };
 
 declare %private function _:create-test-data($param1, $param2, $param3) {
@@ -38,7 +38,7 @@ declare %private function _:create-test-data($param1, $param2, $param3) {
     </body>
   </html>
   case (matches(req:header('accept'), '[+/]json')) return
-  ``[{"message": "Test OK!", 'param1': '`{$param1}`', 'param2': '`{$param2}`', 'param3': '`{$param3}`'}]``
+  map{"message": "Test OK!", 'param1': $param1, 'param2': $param2, 'param3': $param3}
   case (matches(req:header('accept'), '[+/]xml')) return
   <response><message>Test OK!</message><param1>{$param1}</param1><param2>{$param2}</param2><param3>{$param3}</param3></response>
   default return ``[Test OK! `{$param1}``{$param2}``{$param3}`]``
@@ -48,7 +48,7 @@ declare
   %rest:path('tests/test3')
   %rest:GET
 function _:test3() {
-  api-problem:or_result(_:custom-api-problem#0, [])
+  api-problem:or_result(prof:current-ns(), _:custom-api-problem#0, [])
 };
 
 declare %private function _:custom-api-problem() {
@@ -70,7 +70,7 @@ declare
   %rest:path('tests/test4')
   %rest:GET
 function _:test4() {
-  api-problem:or_result(_:standard-http-error#0, [])
+  api-problem:or_result(prof:current-ns(), _:standard-http-error#0, [])
 };
 
 declare %private function _:standard-http-error() {

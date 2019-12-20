@@ -25,7 +25,7 @@ declare function _:or_result($start-time-ns as xs:integer, $api-function as func
             $ret := apply($api-function, $parameters)
         return if ($ret instance of element(rfc7807:problem)) then _:return_problem($start-time-ns, $ret,$header-elements)
         else        
-          (web:response-header(map {'method': 'json'}, $header-elements, map{'message': $_:codes_to_message($ok-status), 'status': $ok-status}),
+          (web:response-header(_:get_serialization_method($ret), $header-elements, map{'message': $_:codes_to_message($ok-status), 'status': $ok-status}),
           _:inject-runtime($start-time-ns, $ret)
           )
     } catch * {
@@ -45,6 +45,15 @@ declare function _:or_result($start-time-ns as xs:integer, $api-function as func
                     {if ($_:enable_trace) then <trace>{$err:module}: {$err:line-number}/{$err:column-number}{replace($err:additional, '^.*Stack Trace:', '', 's')}</trace> else ()}
                 </problem>, $header-elements)     
     }
+};
+
+declare %private function _:get_serialization_method($ret as item()) as map(xs:string, xs:string) {
+  switch(true())
+  case ($ret instance of element(json)) return map {'method': 'json'}
+  case ($ret instance of element() and $ret/local-name() = 'html') return map {'method': 'html'}
+  case ($ret instance of element()) return map {'method': 'xml'}
+  case ($ret instance of map(*)) return map {'method': 'json'}
+  default return map {'method': 'text'}
 };
 
 declare function _:return_problem($start-time-ns as xs:integer, $problem as element(rfc7807:problem), $header-elements as map(xs:string, xs:string)?) as item()+ {

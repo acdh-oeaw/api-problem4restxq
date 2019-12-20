@@ -21,21 +21,21 @@ describe('API Problem reporting', function() {
     it('should run test1', function(){
         return request(baseURI)
           .get('/tests/test1')
-          .expect(200, '')
+          .expect(500, /testError Test1 Test2 Test3<\/title>/)
     });
     it('should run test2', function(){
         return request(baseURI)
           .get('/tests/test2')
-          .expect(200, '')
+          .expect(200, "Test OK!  Test1 Test2 Test3")
     });
     it('should run test3', function(){
         return request(baseURI)
           .get('/tests/test3')
-          .expect(200, '')
+          .expect(402, /Your current balance is 30, but that costs 50.<\/detail>/)
     });
     it('should run test4', function(){
         return request(baseURI)
           .get('/tests/test4')
-          .expect(200, '')
+          .expect(403, /Test access denied!<\/title>/)
     });
 });
