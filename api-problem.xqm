@@ -116,14 +116,68 @@ function _:error-handler($code as xs:string, $description, $value, $module, $lin
                                 "Access-Control-Allow-Credentials": "true"} else ())  
 };
 
-declare %private function _:on_accept_to_json($problem as element(rfc7807:problem)) as item() {
+declare %private function _:on_accept_to_json($problem as element(rfc7807:problem)) {
   let $objects := string-join($problem//*[*[local-name() ne '_']]/local-name(), ' '),
       $arrays := string-join($problem//*[*[local-name() eq '_']]/local-name(), ' '),
       $accept-header := try { req:header("ACCEPT") } catch basex:http { 'application/problem+xml' }
   return
   if (matches($accept-header, '[+/]json'))
-  then json:serialize(<json type="object" objects="{$objects}" arrays="{$arrays}">{$problem/* transform with {delete node @xml:space}}</json>, map {'format': 'direct'})
+  then _:to-json-map(<json type="object" objects="{$objects}" arrays="{$arrays}">{$problem/*}</json>)
+  (: BaseX native function: :)
+  (: json:serialize(<json type="object" objects="{$objects}" arrays="{$arrays}">{$problem/* transform with {delete node @xml:space}}</json>, map {'format': 'direct'}) :)
   else $problem
+};
+
+declare function _:to-json-map($json-xml as element(json)) {
+    (: consistency checks: array -> <_>, object -> exists /*, () -> not exists /*,
+       same for @objects and @ arrays,
+       perhaps attributes? namespaces? :)
+    let $objects := tokenize($json-xml/@objects, " "),
+        $arrays := tokenize($json-xml/@arrays, " ")
+    return if ($json-xml/@type = "object") then map:merge(for $subel in $json-xml/* return _:to-json-map($subel, $objects, $arrays))
+    else if ($json-xml/@type = "array") then array{for $arrayel in $json-xml/*:_/(*|text()) return _:to-json-map($arrayel, $objects, $arrays)}
+    else error(xs:QName("_:json-convert-error"), "Only root types array and json are implemented.")
+};
+
+declare function _:to-json-map($n as node(), $objects as xs:string*, $arrays as xs:string*) {
+    let $objects := if (empty($objects)) then $n/descendant-or-self::*[*[local-name() ne '_']]/local-name() else $objects,
+        $arrays := if (empty($arrays)) then $n/descendant-or-self::*[*[local-name() eq '_']]/local-name() else $arrays
+  return if ($n/local-name() = '_') then array{for $arrayel in $n/(*|text()) return _:to-json-map($arrayel, $objects, $arrays)}
+  else if ($n/text()) then map{_:convert-names-xml-json($n/local-name()): $n/text()}
+  else if ($objects != "" and $n/local-name() = $objects)
+  then map{_:convert-names-xml-json($n/local-name()): map:merge(for $subel in $n/* return _:to-json-map($subel, $objects, $arrays))}
+  else if ($arrays != "" and $n/local-name() = $arrays)
+  then map{_:convert-names-xml-json($n/local-name()): array{for $arrayel in $n/*:_/(*|text()) return _:to-json-map($arrayel, $objects, $arrays)}}
+  else $n
+};
+
+declare function _:convert-names-xml-json($name as xs:string) {
+    string-join(for $part in analyze-string('__0031title__', '__(\d\d\d\d)?')/* return
+    if ($part instance of element(fn:non-match)) then $part/text()
+    else if ($part instance of element(fn:match) and $part/fn:group) then codepoints-to-string(_:decode-hex-string($part/fn:group))
+    else '_', '')
+};
+
+declare function _:decode-hex-string($val as xs:string)
+  as xs:integer
+{
+  _:decodeHexStringHelper(string-to-codepoints($val), 0)
+};
+
+declare %private function _:decodeHexChar($val as xs:integer)
+  as xs:integer
+{
+  let $tmp := $val - 48 (: '0' :)
+  let $tmp := if($tmp <= 9) then $tmp else $tmp - (65-48) (: 'A'-'0' :)
+  let $tmp := if($tmp <= 15) then $tmp else $tmp - (97-65) (: 'a'-'A' :)
+  return $tmp
+};
+
+declare %private function _:decodeHexStringHelper($chars as xs:integer*, $acc as xs:integer)
+  as xs:integer
+{
+  if(empty($chars)) then $acc
+  else _:decodeHexStringHelper(remove($chars,1), ($acc * 16) + _:decodeHexChar($chars[1]))
 };
 
 declare variable $_:codes_to_message := map {
