@@ -12,22 +12,22 @@ declare namespace http = "http://expath.org/ns/http-client";
 
 declare variable $_:enable_trace external := true();
 
-declare function _:or_result($start-time-ns as xs:integer, $api-function as function(*)*, $parameters as array(*)) as item()+ {
-    _:or_result($start-time-ns, $api-function, $parameters, (), ())
+declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*)) as item()+ {
+    _:or_result($start-time, $api-function, $parameters, (), ())
 };
 
-declare function _:or_result($start-time-ns as xs:integer, $api-function as function(*)*, $parameters as array(*), $header-elements as map(xs:string, xs:string)?) as item()+ {
-    _:or_result($start-time-ns, $api-function, $parameters, (), $header-elements)
+declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*), $header-elements as map(xs:string, xs:string)?) as item()+ {
+    _:or_result($start-time, $api-function, $parameters, (), $header-elements)
 };
 
-declare function _:or_result($start-time-ns as xs:integer, $api-function as function(*)*, $parameters as array(*), $ok-status as xs:integer?, $header-elements as map(xs:string, xs:string)?) as item()+ {
+declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*), $ok-status as xs:integer?, $header-elements as map(xs:string, xs:string)?) as item()+ {
     try {
         let $ok-status := if ($ok-status > 200 and $ok-status < 300) then $ok-status else 200,
             $ret := apply($api-function, $parameters)
-        return if ($ret instance of element(rfc7807:problem)) then _:return_problem($start-time-ns, $ret,$header-elements)
+        return if ($ret instance of element(rfc7807:problem)) then _:return_problem($start-time, $ret,$header-elements)
         else        
           (_:response-header(_:get_serialization_method($ret), $header-elements, map{'message': $_:codes_to_message($ok-status), 'status': $ok-status}),
-          _:inject-runtime($start-time-ns, $ret)
+          _:inject-runtime($start-time, $ret)
           )
     } catch * {
         let $status-code := if (namespace-uri-from-QName($err:code) eq 'https://tools.ietf.org/html/rfc7231#section-6') then
@@ -36,7 +36,7 @@ declare function _:or_result($start-time-ns as xs:integer, $api-function as func
                      xs:integer($status-code-from-local-name) > 400 and
                      xs:integer($status-code-from-local-name) < 511) then xs:integer($status-code-from-local-name) else 400
         else (500, _:write-log($err:additional, 'ERROR'))
-        return _:return_problem($start-time-ns,
+        return _:return_problem($start-time,
                 <problem xmlns="urn:ietf:rfc:7807">
                     <type>{namespace-uri-from-QName($err:code)}</type>
                     <title>{$err:description}</title>
@@ -57,7 +57,7 @@ declare %private function _:get_serialization_method($ret as item()) as map(xs:s
   default return map {'method': 'text'}
 };
 
-declare function _:return_problem($start-time-ns as xs:integer, $problem as element(rfc7807:problem), $header-elements as map(xs:string, xs:string)?) as item()+ {
+declare function _:return_problem($start-time as xs:time, $problem as element(rfc7807:problem), $header-elements as map(xs:string, xs:string)?) as item()+ {
 let $accept-header := req:header("ACCEPT"),
     $header-elements := map:merge(($header-elements, map{'Content-Type': if (matches($accept-header, '[+/]json')) then 'application/problem+json' else if (matches($accept-header, 'application/xhtml\+xml')) then 'application/xml' else 'application/problem+xml'})),
     $error-status := if ($problem/rfc7807:status castable as xs:integer) then xs:integer($problem/rfc7807:status) else 400
@@ -66,8 +66,8 @@ return (_:response-header((), $header-elements, map{'message': $problem/rfc7807:
 )   
 };
 
-declare function _:result($start-time-ns as xs:integer, $result as element(rfc7807:problem), $header-elements as map(xs:string, xs:string)?) {
-  _:or_result($start-time-ns, _:return_result#1, [$result], $header-elements)
+declare function _:result($start-time as xs:time, $result as element(rfc7807:problem), $header-elements as map(xs:string, xs:string)?) {
+  _:or_result($start-time, _:return_result#1, [$result], $header-elements)
 };
 
 declare %private function _:return_result($to_return as node()) {
