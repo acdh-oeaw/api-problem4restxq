@@ -1,4 +1,4 @@
-xquery version "3.0";
+xquery version "3.1";
 
 module namespace _ = "https://tools.ietf.org/html/rfc7807";
 import module namespace req = "http://exquery.org/ns/request";
@@ -12,19 +12,19 @@ declare namespace http = "http://expath.org/ns/http-client";
 
 declare variable $_:enable_trace external := true();
 
-declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*)) as item()+ {
-    _:or_result($start-time, $api-function, $parameters, (), ())
+declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*), $accept as xs:string?) as item()+ {
+    _:or_result($start-time, $api-function, $parameters, $accept, (), ())
 };
 
-declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*), $header-elements as map(xs:string, xs:string)?) as item()+ {
-    _:or_result($start-time, $api-function, $parameters, (), $header-elements)
+declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*), $accept as xs:string?, $header-elements as map(xs:string, xs:string)?) as item()+ {
+    _:or_result($start-time, $api-function, $parameters, $accept, (), $header-elements)
 };
 
-declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*), $ok-status as xs:integer?, $header-elements as map(xs:string, xs:string)?) as item()+ {
+declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*), $accept as xs:string?, $ok-status as xs:integer?, $header-elements as map(xs:string, xs:string)?) as item()+ {
     try {
         let $ok-status := if ($ok-status > 200 and $ok-status < 300) then $ok-status else 200,
             $ret := apply($api-function, $parameters)
-        return if ($ret instance of element(rfc7807:problem)) then _:return_problem($start-time, $ret,$header-elements)
+        return if ($ret instance of element(rfc7807:problem)) then _:return_problem($start-time, $ret, $accept, $header-elements)
         else        
           (_:response-header(_:get_serialization_method($ret), $header-elements, map{'message': $_:codes_to_message($ok-status), 'status': $ok-status}),
           _:inject-runtime($start-time, $ret)
@@ -35,7 +35,7 @@ declare function _:or_result($start-time as xs:time, $api-function as function(*
           return if ($status-code-from-local-name castable as xs:integer and 
                      xs:integer($status-code-from-local-name) > 400 and
                      xs:integer($status-code-from-local-name) < 511) then xs:integer($status-code-from-local-name) else 400
-        else (500, _:write-log($err:additional, 'ERROR'))
+        else (500, _:write-log(string-join($exerr:xquery-stack-trace, '&#x0a;'), 'ERROR'))
         return _:return_problem($start-time,
                 <problem xmlns="urn:ietf:rfc:7807">
                     <type>{namespace-uri-from-QName($err:code)}</type>
@@ -43,8 +43,8 @@ declare function _:or_result($start-time as xs:time, $api-function as function(*
                     <detail>{$err:value}</detail>
                     <instance>{namespace-uri-from-QName($err:code)}/{local-name-from-QName($err:code)}</instance>
                     <status>{$status-code}</status>
-                    {if ($_:enable_trace) then <trace>{$err:module}: {$err:line-number}/{$err:column-number}{replace($err:additional, '^.*Stack Trace:', '', 's')}</trace> else ()}
-                </problem>, $header-elements)     
+                    {if ($_:enable_trace) then <trace>[{$err:line-number}:{$err:column-number}:{$err:module}]&#x0a;{string-join($exerr:xquery-stack-trace, '&#x0a;')}</trace> else ()}
+                </problem>, $accept, $header-elements)     
     }
 };
 
@@ -57,17 +57,17 @@ declare %private function _:get_serialization_method($ret as item()) as map(xs:s
   default return map {'method': 'text'}
 };
 
-declare function _:return_problem($start-time as xs:time, $problem as element(rfc7807:problem), $header-elements as map(xs:string, xs:string)?) as item()+ {
-let $accept-header := req:header("ACCEPT"),
+declare function _:return_problem($start-time as xs:time, $problem as element(rfc7807:problem), $accept as xs:string?, $header-elements as map(xs:string, xs:string)?) as item()+ {
+let $accept-header := try { req:header("ACCEPT") } catch exerr:* { if (exists($accept)) then $accept else 'application/json' },
     $header-elements := map:merge(($header-elements, map{'Content-Type': if (matches($accept-header, '[+/]json')) then 'application/problem+json' else if (matches($accept-header, 'application/xhtml\+xml')) then 'application/xml' else 'application/problem+xml'})),
     $error-status := if ($problem/rfc7807:status castable as xs:integer) then xs:integer($problem/rfc7807:status) else 400
 return (_:response-header((), $header-elements, map{'message': $problem/rfc7807:title, 'status': $error-status}),
- _:on_accept_to_json($problem)
+ _:on_accept_to_json($problem, $accept)
 )   
 };
 
-declare function _:result($start-time as xs:time, $result as element(rfc7807:problem), $header-elements as map(xs:string, xs:string)?) {
-  _:or_result($start-time, _:return_result#1, [$result], $header-elements)
+declare function _:result($start-time as xs:time, $result as element(rfc7807:problem), $accept as xs:string?, $header-elements as map(xs:string, xs:string)?) {
+  _:or_result($start-time, _:return_result#1, [$result], $accept, $header-elements)
 };
 
 declare %private function _:return_result($to_return as node()) {
@@ -117,14 +117,15 @@ function _:error-handler($code as xs:string, $description, $value, $module, $lin
                     <instance>{namespace-uri-from-QName(xs:QName($code))}/{local-name-from-QName(xs:QName($code))}</instance>
                     <status>{$status-code}</status>
                     {if ($_:enable_trace) then <trace xml:space="preserve">{replace(replace($additional, '^.*Stopped at ', '', 's'), ':\n.*($|(\n\nStack Trace:(\n)))', '$3')}</trace> else ()}
-                </problem>, if (exists($origin)) then map{"Access-Control-Allow-Origin": $origin,
+                </problem>, $accept, if (exists($origin)) then map{"Access-Control-Allow-Origin": $origin,
                                 "Access-Control-Allow-Credentials": "true"} else ())  
 };
 
-declare %private function _:on_accept_to_json($problem as element(rfc7807:problem)) {
+declare %private function _:on_accept_to_json($problem as element(rfc7807:problem), $accept as xs:string?) {
   let $objects := string-join($problem//*[*[local-name() ne '_']]/local-name(), ' '),
       $arrays := string-join($problem//*[*[local-name() eq '_']]/local-name(), ' '),
-      $accept-header := if (req:header("ACCEPT") = '') then req:header("ACCEPT") else 'application/problem+xml'
+      $accept-header := try { if (req:header("ACCEPT") = '') then req:header("ACCEPT") else 'application/problem+xml' }
+                        catch exerr:* { if (exists($accept)) then $accept else 'application/problem+xml' }
   return
   if (matches($accept-header, '[+/]json'))
   then _:to-json-map(<json type="object" objects="{$objects}" arrays="{$arrays}">{$problem/*}</json>)
@@ -142,6 +143,7 @@ declare function _:to-json-map($json-xml as element(json)) {
     return if ($json-xml/@type = "object") then map:merge(for $subel in $json-xml/* return _:to-json-map($subel, $objects, $arrays))
     else if ($json-xml/@type = "array") then array{for $arrayel in $json-xml/*:_/(*|text()) return _:to-json-map($arrayel, $objects, $arrays)}
     else error(xs:QName("_:json-convert-error"), "Only root types array and json are implemented.")
+(:    } catch * { $err:code||': '||$err:description||' '||serialize($json-xml, map {'method': 'xml', 'indent': true()}) }:)
 };
 
 declare function _:to-json-map($n as node(), $objects as xs:string*, $arrays as xs:string*) {
@@ -149,6 +151,7 @@ declare function _:to-json-map($n as node(), $objects as xs:string*, $arrays as 
         $arrays := if (empty($arrays)) then $n/descendant-or-self::*[*[local-name() eq '_']]/local-name() else $arrays
   return if ($n/local-name() = '_') then array{for $arrayel in $n/(*|text()) return _:to-json-map($arrayel, $objects, $arrays)}
   else if ($n/text()) then map{_:convert-names-xml-json($n/local-name()): $n/text()}
+  else if (not($n/*) and not($n instance of text())) then map{_:convert-names-xml-json($n/local-name()): ''}
   else if ($objects != "" and $n/local-name() = $objects)
   then map{_:convert-names-xml-json($n/local-name()): map:merge(for $subel in $n/* return _:to-json-map($subel, $objects, $arrays))}
   else if ($arrays != "" and $n/local-name() = $arrays)
@@ -157,7 +160,7 @@ declare function _:to-json-map($n as node(), $objects as xs:string*, $arrays as 
 };
 
 declare function _:convert-names-xml-json($name as xs:string) {
-    string-join(for $part in analyze-string('__0031title__', '__(\d\d\d\d)?')/* return
+    string-join(for $part in analyze-string($name, '__(\d\d\d\d)?')/* return
     if ($part instance of element(fn:non-match)) then $part/text()
     else if ($part instance of element(fn:match) and $part/fn:group) then codepoints-to-string(_:decode-hex-string($part/fn:group))
     else '_', '')
@@ -193,7 +196,8 @@ declare %private function _:write-log($message as xs:string, $loglevel as xs:str
 };
 
 declare %private function _:response-header($output as map(*)?, $headers as map(*)?, $atts as map(*)?) as element(rest:response) {
-<rest:response xmlns:rest="http://exquery.org/ns/restxq">
+let $output := map:merge(if (exists($headers) and contains($headers('Content-Type'), 'json')) then map{'method': 'json'} else ($output))
+return <rest:response xmlns:rest="http://exquery.org/ns/restxq">
   <http:response xmlns:http="http://expath.org/ns/http-client">
     {if (exists($atts)) then for $k in map:keys($atts) return attribute {$k} {$atts($k)} else ()}
     {if (exists($headers)) then for $k in map:keys($headers) return <http:header name="{$k}" value="{$headers($k)}"/> else ()}
