@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project default="xar" name="api-problem">
+
+  <property name="build.dir" value="build"/>
+  <property file="local.build.properties"/>
+  <property file="build.properties"/>
+
+  <antversion property="antversion"/>
+  <target name="antversion-test">
+    <antversion property="antversionReady" atleast="1.10"/>
+    <fail unless="antversionReady">installed version of ant (${antversion}) is lower than the required one (1.10.0)</fail>
+    <echo message="installed version of ant (${antversion}) is satisfying"/>
+  </target>
+
+  <target name="xar" depends="antversion-test">
+      <copy file="expath-pkg.xml.tmpl" tofile="expath-pkg.xml" filtering="true" overwrite="true">
+          <filterset>
+              <filter token="project.version" value="${project.version}"/>
+              <filter token="project.title" value="${project.title}"/>
+              <filter token="project.abbrev" value="${project.abbrev}"/>
+              <filter token="project.name" value="${project.name}"/>
+              <filter token="project.processorversion" value="${project.processorversion}"/>
+          </filterset>
+      </copy>
+
+      <mkdir dir="${build.dir}"/>
+      <zip basedir="." destfile="${destfile}" defaultexcludes="no"
+          excludes=".git/,.vscode/,${build.dir}/,${test.dir}/,*.tmpl,.gitignore"/>
+  </target>
+
+</project>

@@ -2,7 +2,8 @@ xquery version "3.0";
 
 module namespace _ = "https://tools.ietf.org/html/rfc7807";
 import module namespace req = "http://exquery.org/ns/request";
-import module namespace admin = "http://basex.org/modules/admin"; (: for logging :)
+import module namespace console = "http://exist-db.org/xquery/console";
+import module namespace util = "http://exist-db.org/xquery/util";
 
 declare namespace rfc7807 = "urn:ietf:rfc:7807";
 declare namespace response-codes = "https://tools.ietf.org/html/rfc7231#section-6";
@@ -25,7 +26,7 @@ declare function _:or_result($start-time-ns as xs:integer, $api-function as func
             $ret := apply($api-function, $parameters)
         return if ($ret instance of element(rfc7807:problem)) then _:return_problem($start-time-ns, $ret,$header-elements)
         else        
-          (web:response-header(_:get_serialization_method($ret), $header-elements, map{'message': $_:codes_to_message($ok-status), 'status': $ok-status}),
+          (_:response-header(_:get_serialization_method($ret), $header-elements, map{'message': $_:codes_to_message($ok-status), 'status': $ok-status}),
           _:inject-runtime($start-time-ns, $ret)
           )
     } catch * {
@@ -34,7 +35,7 @@ declare function _:or_result($start-time-ns as xs:integer, $api-function as func
           return if ($status-code-from-local-name castable as xs:integer and 
                      xs:integer($status-code-from-local-name) > 400 and
                      xs:integer($status-code-from-local-name) < 511) then xs:integer($status-code-from-local-name) else 400
-        else (500, admin:write-log($err:additional, 'ERROR'))
+        else (500, _:write-log($err:additional, 'ERROR'))
         return _:return_problem($start-time-ns,
                 <problem xmlns="urn:ietf:rfc:7807">
                     <type>{namespace-uri-from-QName($err:code)}</type>
@@ -57,10 +58,10 @@ declare %private function _:get_serialization_method($ret as item()) as map(xs:s
 };
 
 declare function _:return_problem($start-time-ns as xs:integer, $problem as element(rfc7807:problem), $header-elements as map(xs:string, xs:string)?) as item()+ {
-let $accept-header := try { req:header("ACCEPT") } catch basex:http { 'application/problem+xml' },
+let $accept-header := req:header("ACCEPT"),
     $header-elements := map:merge(($header-elements, map{'Content-Type': if (matches($accept-header, '[+/]json')) then 'application/problem+json' else if (matches($accept-header, 'application/xhtml\+xml')) then 'application/xml' else 'application/problem+xml'})),
     $error-status := if ($problem/rfc7807:status castable as xs:integer) then xs:integer($problem/rfc7807:status) else 400
-return (web:response-header((), $header-elements, map{'message': $problem/rfc7807:title, 'status': $error-status}),
+return (_:response-header((), $header-elements, map{'message': $problem/rfc7807:title, 'status': $error-status}),
  _:on_accept_to_json($problem)
 )   
 };
@@ -73,14 +74,18 @@ declare %private function _:return_result($to_return as node()) {
   $to_return
 };
 
-declare %private function _:inject-runtime($start as xs:integer, $ret) {
+declare %private function _:inject-runtime($start as xs:time, $ret) {
   if ($ret instance of map(*)) then map:merge(($ret, map {'took': _:runtime($start)}))
-  else if ($ret instance of element(json)) then $ret transform with { insert node <took>{_:runtime($start)}</took> as last into . }
+  else if ($ret instance of element(json)) then <json>{($ret/(@*, *), <took>{_:runtime($start)}</took>)}</json>
   else $ret
 };
 
-declare %private function _:runtime($start as xs:integer) {
-  ((prof:current-ns() - $start) idiv 10000) div 100
+declare function _:runtime($start as xs:time) {
+    let $diff as xs:dayTimeDuration := util:system-time() - $start
+    return
+        (hours-from-duration($diff) * 60 * 60 +
+        minutes-from-duration($diff) * 60 +
+        seconds-from-duration($diff)) * 1000
 };
 
 declare
@@ -96,15 +101,15 @@ declare
   %rest:error-param("column-number", "{$column-number}")
   %rest:error-param("additional", "{$additional}")
 function _:error-handler($code as xs:string, $description, $value, $module, $line-number, $column-number, $additional) as item()+ {
-        let $start-time-ns := prof:current-ns(),
-            $origin := try { req:header("Origin") } catch basex:http {'urn:local'},
+        let $start-time := util:system-time(),
+            $origin := req:header("Origin"),
             $status-code := 
           let $status-code-from-local-name := replace(local-name-from-QName(xs:QName($code)), '_', '')
           return if ($status-code-from-local-name castable as xs:integer and 
                      xs:integer($status-code-from-local-name) >= 400 and
                      xs:integer($status-code-from-local-name) < 511) then xs:integer($status-code-from-local-name) else
-                     (500, admin:write-log($additional, 'ERROR'))
-        return _:return_problem($start-time-ns,
+                     (500, _:write-log($additional, 'ERROR'))
+        return _:return_problem($start-time,
                 <problem xmlns="urn:ietf:rfc:7807">
                     <type>{namespace-uri-from-QName(xs:QName($code))}</type>
                     <title>{$description}</title>
@@ -119,7 +124,7 @@ function _:error-handler($code as xs:string, $description, $value, $module, $lin
 declare %private function _:on_accept_to_json($problem as element(rfc7807:problem)) {
   let $objects := string-join($problem//*[*[local-name() ne '_']]/local-name(), ' '),
       $arrays := string-join($problem//*[*[local-name() eq '_']]/local-name(), ' '),
-      $accept-header := try { req:header("ACCEPT") } catch basex:http { 'application/problem+xml' }
+      $accept-header := if (req:header("ACCEPT") = '') then req:header("ACCEPT") else 'application/problem+xml'
   return
   if (matches($accept-header, '[+/]json'))
   then _:to-json-map(<json type="object" objects="{$objects}" arrays="{$arrays}">{$problem/*}</json>)
@@ -178,6 +183,25 @@ declare %private function _:decodeHexStringHelper($chars as xs:integer*, $acc as
 {
   if(empty($chars)) then $acc
   else _:decodeHexStringHelper(remove($chars,1), ($acc * 16) + _:decodeHexChar($chars[1]))
+};
+
+declare %private function _:write-log($message as xs:string, $loglevel as xs:string) as empty-sequence() {
+  let $log := (console:log($loglevel, $message),
+    util:log($loglevel, $message),
+    util:log-system-err($message))
+  return ()
+};
+
+declare %private function _:response-header($output as map(*)?, $headers as map(*)?, $atts as map(*)?) as element(rest:response) {
+<rest:response xmlns:rest="http://exquery.org/ns/restxq">
+  <http:response xmlns:http="http://expath.org/ns/http-client">
+    {if (exists($atts)) then for $k in map:keys($atts) return attribute {$k} {$atts($k)} else ()}
+    {if (exists($headers)) then for $k in map:keys($headers) return <http:header name="{$k}" value="{$headers($k)}"/> else ()}
+  </http:response>
+  <output:serialization-parameters xmlns:output="http://www.w3.org/2010/xslt-xquery-serialization">
+    {if (exists($output)) then for $k in map:keys($output) return element {xs:QName('output:'||$k)} {namespace {'output'} {'http://www.w3.org/2010/xslt-xquery-serialization'}, attribute {'value'} {$output($k)} } else ()} 
+  </output:serialization-parameters>
+</rest:response>
 };
 
 declare variable $_:codes_to_message := map {

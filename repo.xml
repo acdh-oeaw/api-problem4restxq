@@ -1,0 +1,14 @@
+<meta xmlns="http://exist-db.org/xquery/repo">
+    <description>An API Problem implementation</description>
+    <author>Omar Siam</author>
+    <website>https://git.siam.homeunix.net/simar/api-problem-basex</website>
+    <status>stable</status>
+    <license ref="https://spdx.org/licenses/">LGPL-3.0-or-later</license>
+    <copyright>true</copyright>
+    <type>application</type>
+    <target>api-problem</target>
+    <changelog>
+      <change version="1.0.0">
+      </change>
+    </changelog>
+</meta>
