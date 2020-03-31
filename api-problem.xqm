@@ -35,7 +35,10 @@ declare function _:or_result($start-time as xs:time, $api-function as function(*
           return if ($status-code-from-local-name castable as xs:integer and 
                      xs:integer($status-code-from-local-name) > 400 and
                      xs:integer($status-code-from-local-name) < 511) then xs:integer($status-code-from-local-name) else 400
-        else (500, _:write-log(string-join($exerr:xquery-stack-trace, '&#x0a;'), 'ERROR'))
+        else (500, _:write-log('Program error: returning 500'||'&#x0a;'||
+                               namespace-uri-from-QName($err:code)||':'||local-name-from-QName($err:code)||'&#x0a;'||
+                               $err:description||'&#x0a;'||
+                               string-join($exerr:xquery-stack-trace, '&#x0a;'), 'ERROR'))
         return _:return_problem($start-time,
                 <problem xmlns="urn:ietf:rfc:7807">
                     <type>{namespace-uri-from-QName($err:code)}</type>
@@ -62,7 +65,7 @@ let $accept-header := try { req:header("ACCEPT") } catch exerr:* { if (exists($a
     $header-elements := map:merge(($header-elements, map{'Content-Type': if (matches($accept-header, '[+/]json')) then 'application/problem+json' else if (matches($accept-header, 'application/xhtml\+xml')) then 'application/xml' else 'application/problem+xml'})),
     $error-status := if ($problem/rfc7807:status castable as xs:integer) then xs:integer($problem/rfc7807:status) else 400
 return (_:response-header((), $header-elements, map{'message': $problem/rfc7807:title, 'status': $error-status}),
- _:on_accept_to_json($problem, $accept)
+ _:inject-runtime($start-time, _:on_accept_to_json($problem, $accept))
 )   
 };
 
@@ -77,6 +80,7 @@ declare %private function _:return_result($to_return as node()) {
 declare %private function _:inject-runtime($start as xs:time, $ret) {
   if ($ret instance of map(*)) then map:merge(($ret, map {'took': _:runtime($start)}))
   else if ($ret instance of element(json)) then <json>{($ret/(@*, *), <took>{_:runtime($start)}</took>)}</json>
+  else if ($ret instance of element(rfc7807:problem)) then <problem xmlns="urn:ietf:rfc:7807">{($ret/(@*, *), <took>{_:runtime($start)}</took>)}</problem>
   else $ret
 };
 
@@ -108,7 +112,10 @@ function _:error-handler($code as xs:string, $description, $value, $module, $lin
           return if ($status-code-from-local-name castable as xs:integer and 
                      xs:integer($status-code-from-local-name) >= 400 and
                      xs:integer($status-code-from-local-name) < 511) then xs:integer($status-code-from-local-name) else
-                     (500, _:write-log($additional, 'ERROR'))
+                     (500, _:write-log('Program error: returning 500'||'&#x0a;'||
+                           namespace-uri-from-QName($err:code)||':'||local-name-from-QName($err:code)||'&#x0a;'||
+                           $err:description||'&#x0a;'||
+                           string-join($exerr:xquery-stack-trace, '&#x0a;'), 'ERROR'))
         return _:return_problem($start-time,
                 <problem xmlns="urn:ietf:rfc:7807">
                     <type>{namespace-uri-from-QName(xs:QName($code))}</type>
