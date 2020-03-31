@@ -12,7 +12,7 @@ declare
   %rest:header-param('Accept', '{$accept}')
   %rest:path('tests/test1')
 function _:test1($accept as xs:string*) {
-  api-problem:or_result(util:system-time(), _:stack_l1#3, [' Test1', ' Test2', ' Test3'], $accept)
+  api-problem:or_result(util:system-time(), _:stack_l1#3, [' Test1', ' Test2', ' Test3'], string-join($accept, ','))
 };
 
 declare %private function _:stack_l1($param1, $param2, $param3) {
@@ -36,7 +36,7 @@ declare
   %rest:path('tests/test2')
   %rest:GET
 function _:test2($accept as xs:string*) {
-   api-problem:or_result(util:system-time(), _:create-test-data#3, [' Test1', ' Test2', ' Test3'], $accept)
+   api-problem:or_result(util:system-time(), _:create-test-data#3, [' Test1', ' Test2', ' Test3'], string-join($accept, ','))
 };
 
 declare %private function _:create-test-data($param1, $param2, $param3) {
