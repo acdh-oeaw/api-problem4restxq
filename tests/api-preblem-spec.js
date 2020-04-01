@@ -17,7 +17,7 @@ request.Test.prototype._assertStatus = function (status, res) {
 };
 
 describe('API Problem reporting', function() {
-    const baseURI = 'http://localhost:8984';
+    const baseURI = 'https://exist5x.hephaistos.arz.oeaw.ac.at/exist/restxq';
     it('should run test1', function(){
         return request(baseURI)
           .get('/tests/test1')
@@ -31,11 +31,13 @@ describe('API Problem reporting', function() {
     it('should run test3', function(){
         return request(baseURI)
           .get('/tests/test3')
+          .set('Accept', 'application/xml')
           .expect(402, /Your current balance is 30, but that costs 50.<\/detail>/)
     });
     it('should run test4', function(){
         return request(baseURI)
           .get('/tests/test4')
+          .set('Accept', 'application/xml')
           .expect(403, /Test access denied!<\/title>/)
     });
 });
