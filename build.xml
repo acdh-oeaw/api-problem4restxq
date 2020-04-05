@@ -24,7 +24,7 @@
       </copy>
 
       <mkdir dir="${build.dir}"/>
-      <zip basedir="." destfile="${destfile}" defaultexcludes="no" excludes=".git/,.vscode/,${build.dir}/,${test.dir}/,*.tmpl,.gitignore"/>
+      <zip basedir="." destfile="${destfile}" defaultexcludes="no" excludes=".git/,.vscode/,${build.dir}/,node_modules/,*.tmpl,.gitignore"/>
   </target>
 
 </project>
