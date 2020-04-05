@@ -30,7 +30,8 @@ declare function _:or_result($start-time as xs:time, $api-function as function(*
           _:inject-runtime($start-time, $ret)
           )
     } catch * {
-        let $status-code := if (namespace-uri-from-QName($err:code) eq 'https://tools.ietf.org/html/rfc7231#section-6') then
+        let $fixed-stack := _:fix-stack($exerr:xquery-stack-trace, $err:module, $err:line-number, $err:column-number),
+            $status-code := if (namespace-uri-from-QName($err:code) eq 'https://tools.ietf.org/html/rfc7231#section-6') then
           let $status-code-from-local-name := replace(local-name-from-QName($err:code), '_', '')
           return if ($status-code-from-local-name castable as xs:integer and 
                      xs:integer($status-code-from-local-name) > 400 and
@@ -38,6 +39,7 @@ declare function _:or_result($start-time as xs:time, $api-function as function(*
         else (500, _:write-log('Program error: returning 500'||'&#x0a;'||
                                namespace-uri-from-QName($err:code)||':'||local-name-from-QName($err:code)||'&#x0a;'||
                                $err:description||'&#x0a;'||
+                               '['||$err:line-number||':'||$err:column-number||':'||$err:module||']&#x0a;'||
                                string-join($exerr:xquery-stack-trace, '&#x0a;'), 'ERROR'))
         return _:return_problem($start-time,
                 <problem xmlns="urn:ietf:rfc:7807">
@@ -46,7 +48,7 @@ declare function _:or_result($start-time as xs:time, $api-function as function(*
                     <detail>{$err:value}</detail>
                     <instance>{namespace-uri-from-QName($err:code)}/{local-name-from-QName($err:code)}</instance>
                     <status>{$status-code}</status>
-                    {if ($_:enable_trace) then <trace>[{$err:line-number}:{$err:column-number}:{$err:module}]&#x0a;{string-join($exerr:xquery-stack-trace, '&#x0a;')}</trace> else ()}
+                    {if ($_:enable_trace) then <trace>&#x0a;{$fixed-stack}</trace> else ()}
                 </problem>, $accept, $header-elements)     
     }
 };
@@ -93,29 +95,33 @@ declare function _:runtime($start as xs:time) {
 };
 
 declare
-(: use when there is another error handler :)
-(:  %rest:error('Q{https://tools.ietf.org/html/rfc7231#section-6}*') :)
-(: use when this is the only error handler :)
-  %rest:error('*')
-  %rest:error-param("code", "{$code}")
-  %rest:error-param("description", "{$description}")
-  %rest:error-param("value", "{$value}")
-  %rest:error-param("module", "{$module}")
-  %rest:error-param("line-number", "{$line-number}")
-  %rest:error-param("column-number", "{$column-number}")
-  %rest:error-param("additional", "{$additional}")
-function _:error-handler($code as xs:string, $description, $value, $module, $line-number, $column-number, $additional) as item()+ {
+(: In BaseX there is an annotation to install a catch all error handler.
+ : In exist-db you can add /db/apps/api-problem/catch-all-handler.xql as a 
+ : handler for every (!) uncaught error in web.xml
+ : Add
+ : <error-page>
+ :     <location>/rest/db/apps/api-problem/catch-all-handler.xql</location>
+ : </error-page>
+ : After that you need to restart.
+ : If you don't want to do that remember to always split RestXQ functions in two
+ : and use a minimal caller to the actual function with the %rest annotations
+ : function _:example($accept as xs:string*) {
+ :   api-problem:or_result(util:system-time(), _:actual#0, [], string-join($accept, ','))
+ : };
+ :)
+function _:error-handler($code as xs:string, $description, $value, $module, $line-number, $column-number, $additional, $accept, $origin) {
         let $start-time := util:system-time(),
-            $origin := req:header("Origin"),
+            $origin := $origin,
+            $code := try { xs:string(xs:QName($code)) } catch * { 'response-codes:_500' },
             $status-code := 
           let $status-code-from-local-name := replace(local-name-from-QName(xs:QName($code)), '_', '')
           return if ($status-code-from-local-name castable as xs:integer and 
                      xs:integer($status-code-from-local-name) >= 400 and
                      xs:integer($status-code-from-local-name) < 511) then xs:integer($status-code-from-local-name) else
                      (500, _:write-log('Program error: returning 500'||'&#x0a;'||
-                           namespace-uri-from-QName($err:code)||':'||local-name-from-QName($err:code)||'&#x0a;'||
-                           $err:description||'&#x0a;'||
-                           string-join($exerr:xquery-stack-trace, '&#x0a;'), 'ERROR'))
+                           namespace-uri-from-QName(xs:QName($code))||':'||local-name-from-QName(xs:QName($code))||'&#x0a;'||
+                           $description||'&#x0a;'||
+                           $additional, 'ERROR'))
         return _:return_problem($start-time,
                 <problem xmlns="urn:ietf:rfc:7807">
                     <type>{namespace-uri-from-QName(xs:QName($code))}</type>
@@ -123,9 +129,38 @@ function _:error-handler($code as xs:string, $description, $value, $module, $lin
                     <detail>{$value}</detail>
                     <instance>{namespace-uri-from-QName(xs:QName($code))}/{local-name-from-QName(xs:QName($code))}</instance>
                     <status>{$status-code}</status>
-                    {if ($_:enable_trace) then <trace xml:space="preserve">{replace(replace($additional, '^.*Stopped at ', '', 's'), ':\n.*($|(\n\nStack Trace:(\n)))', '$3')}</trace> else ()}
+                    {if ($_:enable_trace) then <trace xml:space="preserve">&#x0a;{$additional}</trace> else ()}
                 </problem>, $accept, if (exists($origin)) then map{"Access-Control-Allow-Origin": $origin,
                                 "Access-Control-Allow-Credentials": "true"} else ())  
+};
+
+declare function _:fix-stack($raw-stack as xs:string*, $module as xs:string?, $line-number as xs:integer?, $column-number as xs:integer?) as xs:string? {
+  if (empty($raw-stack)) then '??? '||'['||$line-number||':'||$column-number||':'||$module||']'
+  else let $trace-lines := (
+        map {
+            'line': $line-number,
+            'column': $column-number
+        },
+        for $tl in $raw-stack
+        let $parts := analyze-string($tl, '^(\s+|at )?([^\[]+)\[(-?\d+):(-?\d+):(.*)\]')
+        where $parts//*:group[@nr=1]
+        return map {
+                'function': xs:string($parts//*:group[@nr=2]),
+                'line': xs:integer($parts//*:group[@nr=3]),
+                'column': xs:integer($parts//*:group[@nr=4]),
+                'module': xs:string($parts//*:group[@nr=5])
+            }
+        ),
+        $fixed-trace-lines := for $tl at $i in $trace-lines
+        where $tl('line') >= 0
+        return map{
+                'function': if (exists($trace-lines[$i+1])) then $trace-lines[$i+1]('function') else '??? ',
+                'line': $tl('line'),
+                'column': $tl('column'),
+                'module': if (exists($trace-lines[$i+1])) then $trace-lines[$i+1]('module') else $module
+        }
+    return string-join(for $tl in $fixed-trace-lines return $tl('function')||'['||$tl('line')||':'||$tl('column')||':'||$tl('module')||']'
+    , '&#x0a;')
 };
 
 declare %private function _:on_accept_to_json($problem as element(rfc7807:problem), $accept as xs:string?) {
@@ -202,7 +237,7 @@ declare %private function _:write-log($message as xs:string, $loglevel as xs:str
   return ()
 };
 
-declare %private function _:response-header($output as map(*)?, $headers as map(*)?, $atts as map(*)?) as element(rest:response) {
+declare function _:response-header($output as map(*)?, $headers as map(*)?, $atts as map(*)?) as element(rest:response) {
 let $output := map:merge(if (exists($headers) and contains($headers('Content-Type'), 'json')) then map{'method': 'json'} else ($output))
 return <rest:response xmlns:rest="http://exquery.org/ns/restxq">
   <http:response xmlns:http="http://expath.org/ns/http-client">

@@ -2,6 +2,7 @@ xquery version "3.1";
 
 module namespace _ = "https://tools.ietf.org/html/rfc7807/tests";
 import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem.xqm";
+import module namespace test-call-stack = "https://tools.ietf.org/html/rfc7807/test-call-stack" at "test-call-stack.xqm";
 import module namespace rest = "http://exquery.org/ns/restxq";
 import module namespace req = "http://exquery.org/ns/request";
 
@@ -87,6 +88,40 @@ function _:test4() {
   api-problem:or_result(util:system-time(), _:standard-http-error#0, [], req:header("ACCEPT"))
 };
 
+declare function _:template-test4($node as node(), $model as map(*)) {
+  _:standard-http-error()
+};
+
 declare %private function _:standard-http-error() {
-   error(xs:QName('response-codes:_403'), 'Test access denied!')
+   error(xs:QName('response-codes:_403'), 'Test access denied!', 'This is wrapped!')
+};
+
+declare
+  %rest:path('tests/test5')
+  %rest:GET
+function _:test5() {
+    error(xs:QName('response-codes:_403'), 'Test access denied!', 'This is not wrapped!')
+};
+
+declare
+  %rest:path('tests/test6')
+  %rest:GET
+function _:test6() {
+    test-call-stack:stack-int_l1()
+};
+
+declare function _:template-test6($node as node(), $model as map(*)) {
+    test-call-stack:stack-int_l1()
+};
+
+declare
+  %rest:GET
+  %rest:header-param('Accept', '{$accept}')
+  %rest:path('tests/test7')
+function _:test7($accept as xs:string*) {
+  api-problem:or_result(util:system-time(), _:_test7#0, [], string-join($accept, ','))
+};
+
+declare %private function _:_test7() {
+    test-call-stack:stack_l1(' Test1', ' Test2', ' Test3')
 };

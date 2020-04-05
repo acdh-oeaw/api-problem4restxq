@@ -24,8 +24,7 @@
       </copy>
 
       <mkdir dir="${build.dir}"/>
-      <zip basedir="." destfile="${destfile}" defaultexcludes="no"
-          excludes=".git/,.vscode/,${build.dir}/,${test.dir}/,*.tmpl,.gitignore,index.html,controller.xql"/>
+      <zip basedir="." destfile="${destfile}" defaultexcludes="no" excludes=".git/,.vscode/,${build.dir}/,${test.dir}/,*.tmpl,.gitignore"/>
   </target>
 
 </project>
