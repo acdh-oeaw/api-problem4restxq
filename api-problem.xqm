@@ -11,6 +11,7 @@ declare namespace rest = "http://exquery.org/ns/restxq";
 declare namespace http = "http://expath.org/ns/http-client";
 
 declare variable $_:enable_trace external := true();
+declare variable $_:DATA := 'api-problem.data';
 
 declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*), $accept as xs:string?) as item()+ {
     _:or_result($start-time, $api-function, $parameters, $accept, (), ())
@@ -44,13 +45,18 @@ declare function _:or_result($start-time as xs:time, $api-function as function(*
         return _:return_problem($start-time,
                 <problem xmlns="urn:ietf:rfc:7807">
                     <type>{namespace-uri-from-QName($err:code)}</type>
-                    <title>{$err:description}</title>
+                    <title>{xs:string($err:code)}: {$err:description}</title>
                     <detail>{$err:value}</detail>
-                    <instance>{namespace-uri-from-QName($err:code)}/{local-name-from-QName($err:code)}</instance>
+                    <instance>{_:code_to_instance_uri($err:code)}</instance>
                     <status>{$status-code}</status>
                     {if ($_:enable_trace) then <trace>&#x0a;{$fixed-stack}</trace> else ()}
                 </problem>, $accept, $header-elements)     
     }
+};
+
+declare %private function _:code_to_instance_uri($code as xs:QName) as xs:string {
+    if (exists($_:problem_qname_to_uri(xs:string($code)))) then $_:problem_qname_to_uri(xs:string($code))
+    else namespace-uri-from-QName($code)||'/'||local-name-from-QName($code)
 };
 
 declare %private function _:get_serialization_method($ret as item()) as map(xs:string, xs:string) {
@@ -65,6 +71,7 @@ declare %private function _:get_serialization_method($ret as item()) as map(xs:s
 declare function _:return_problem($start-time as xs:time, $problem as element(rfc7807:problem), $accept as xs:string?, $header-elements as map(xs:string, xs:string)?) as item()+ {
 let $accept-header := try { req:header("ACCEPT") } catch exerr:* { if (exists($accept)) then $accept else 'application/json' },
     $header-elements := map:merge(($header-elements, map{'Content-Type': if (matches($accept-header, '[+/]json')) then 'application/problem+json' else if (matches($accept-header, 'application/xhtml\+xml')) then 'application/xml' else 'application/problem+xml'})),
+(:    $log := console:log($header-elements),:)
     $error-status := if ($problem/rfc7807:status castable as xs:integer) then xs:integer($problem/rfc7807:status) else 400
 return (_:response-header((), $header-elements, map{'message': $problem/rfc7807:title, 'status': $error-status}),
  _:inject-runtime($start-time, _:on_accept_to_json($problem, $accept))
@@ -125,9 +132,9 @@ function _:error-handler($code as xs:string, $description, $value, $module, $lin
         return _:return_problem($start-time,
                 <problem xmlns="urn:ietf:rfc:7807">
                     <type>{namespace-uri-from-QName(xs:QName($code))}</type>
-                    <title>{$description}</title>
+                    <title>{xs:string($code)}: {$description}</title>
                     <detail>{$value}</detail>
-                    <instance>{namespace-uri-from-QName(xs:QName($code))}/{local-name-from-QName(xs:QName($code))}</instance>
+                    <instance>{_:code_to_instance_uri(xs:QName($code))}</instance>
                     <status>{$status-code}</status>
                     {if ($_:enable_trace) then <trace xml:space="preserve">&#x0a;{$additional}</trace> else ()}
                 </problem>, $accept, if (exists($origin)) then map{"Access-Control-Allow-Origin": $origin,
@@ -250,6 +257,43 @@ return <rest:response xmlns:rest="http://exquery.org/ns/restxq">
 </rest:response>
 };
 
+declare function _:as_html_pre($node as node(), $model as map(*)) {
+  <pre xmlns="http://www.w3.org/1999/xhtml">{serialize($model($_:DATA), map{'indent': true()})}</pre>  
+};
+
+declare function _:trace_as_pre($node as node(), $model as map(*)) {
+  <pre xmlns="http://www.w3.org/1999/xhtml">{$model($_:DATA)/rfc7807:trace/text()}</pre>  
+};
+
+declare function _:type($node as node(), $model as map(*)) {
+  $model($_:DATA)/rfc7807:type/text()
+};
+
+declare function _:type_as_link($node as node(), $model as map(*), $link-text as xs:string) {
+  <a href="{$model($_:DATA)/rfc7807:type}">{$node/@target}{$link-text}</a>
+};
+
+declare function _:instance($node as node(), $model as map(*)) {
+  $model($_:DATA)/rfc7807:instance/text()
+};
+
+declare function _:instance_as_link($node as node(), $model as map(*), $link-text as xs:string) {
+  <a href="{$model($_:DATA)/rfc7807:instance}">{$node/@target}{$link-text}</a>
+};
+
+declare function _:title($node as node(), $model as map(*)) {
+  $model($_:DATA)/rfc7807:title/text()
+};
+
+declare function _:detail($node as node(), $model as map(*)) {
+  if ($model($_:DATA)/rfc7807:detail/text()) then $model($_:DATA)/rfc7807:detail/text()
+  else 'If the error was caught by an error-handler or error-page configuration then there are no details available, sorry.'
+};
+
+declare function _:status($node as node(), $model as map(*)) {
+  $model($_:DATA)/rfc7807:status/text()
+};
+
 declare variable $_:codes_to_message := map {
     100: 'Continue',
     101: 'Switching Protocols',
@@ -322,4 +366,121 @@ declare variable $_:codes_to_message := map {
     509: 'Bandwidth Limit Exceeded',
     510: 'Not Extended',
     511: 'Network Authentication Required'
+};
+
+(:  <instance> - A URI reference that identifies the specific
+      occurrence of the problem.  It may or may not yield further
+      information if dereferenced. :)
+      
+declare variable $_:problem_qname_to_uri := map {
+(: from https://tools.ietf.org/html/rfc7231#section-6.1 :)
+    'response-codes:_100': 'https://tools.ietf.org/html/rfc7231#section-6.2.1',
+    'response-codes:_101': 'https://tools.ietf.org/html/rfc7231#section-6.2.2',
+    'response-codes:_200': 'https://tools.ietf.org/html/rfc7231#section-6.3.1',
+    'response-codes:_201': 'https://tools.ietf.org/html/rfc7231#section-6.3.2',
+    'response-codes:_202': 'https://tools.ietf.org/html/rfc7231#section-6.3.3',
+    'response-codes:_203': 'https://tools.ietf.org/html/rfc7231#section-6.3.4',
+    'response-codes:_204': 'https://tools.ietf.org/html/rfc7231#section-6.3.5',
+    'response-codes:_205': 'https://tools.ietf.org/html/rfc7231#section-6.3.6',
+    'response-codes:_206': 'https://tools.ietf.org/html/rfc7233#section-4.1',
+    'response-codes:_300': 'https://tools.ietf.org/html/rfc7231#section-6.4.1',
+    'response-codes:_301': 'https://tools.ietf.org/html/rfc7231#section-6.4.2',
+    'response-codes:_302': 'https://tools.ietf.org/html/rfc7231#section-6.4.3',
+    'response-codes:_303': 'https://tools.ietf.org/html/rfc7231#section-6.4.4',
+    'response-codes:_304': 'https://tools.ietf.org/html/rfc7232#section-4.1',
+    'response-codes:_305': 'https://tools.ietf.org/html/rfc7231#section-6.4.5',
+    'response-codes:_307': 'https://tools.ietf.org/html/rfc7231#section-6.4.7',
+    'response-codes:_400': 'https://tools.ietf.org/html/rfc7231#section-6.5.1',
+    'response-codes:_401': 'https://tools.ietf.org/html/rfc7235#section-3.1',
+    'response-codes:_402': 'https://tools.ietf.org/html/rfc7231#section-6.5.2',
+    'response-codes:_403': 'https://tools.ietf.org/html/rfc7231#section-6.5.3',
+    'response-codes:_404': 'https://tools.ietf.org/html/rfc7231#section-6.5.4',
+    'response-codes:_405': 'https://tools.ietf.org/html/rfc7231#section-6.5.5',
+    'response-codes:_406': 'https://tools.ietf.org/html/rfc7231#section-6.5.6',
+    'response-codes:_407': 'https://tools.ietf.org/html/rfc7235#section-3.2',
+    'response-codes:_408': 'https://tools.ietf.org/html/rfc7231#section-6.5.7',
+    'response-codes:_409': 'https://tools.ietf.org/html/rfc7231#section-6.5.8',
+    'response-codes:_410': 'https://tools.ietf.org/html/rfc7231#section-6.5.9',
+    'response-codes:_411': 'https://tools.ietf.org/html/rfc7231#section-6.5.10',
+    'response-codes:_412': 'https://tools.ietf.org/html/rfc7232#section-4.2',
+    'response-codes:_413': 'https://tools.ietf.org/html/rfc7231#section-6.5.11',
+    'response-codes:_414': 'https://tools.ietf.org/html/rfc7231#section-6.5.12',
+    'response-codes:_415': 'https://tools.ietf.org/html/rfc7231#section-6.5.13',
+    'response-codes:_416': 'https://tools.ietf.org/html/rfc7233#section-4.4',
+    'response-codes:_417': 'https://tools.ietf.org/html/rfc7231#section-6.5.14',
+    'response-codes:_426': 'https://tools.ietf.org/html/rfc7231#section-6.5.15',
+    'response-codes:_500': 'https://tools.ietf.org/html/rfc7231#section-6.6.1',
+    'response-codes:_501': 'https://tools.ietf.org/html/rfc7231#section-6.6.2',
+    'response-codes:_502': 'https://tools.ietf.org/html/rfc7231#section-6.6.3',
+    'response-codes:_503': 'https://tools.ietf.org/html/rfc7231#section-6.6.4',
+    'response-codes:_504': 'https://tools.ietf.org/html/rfc7231#section-6.6.5',
+    'response-codes:_505': 'https://tools.ietf.org/html/rfc7231#section-6.6.6',
+(:  from https://www.w3.org/TR/xpath-functions-31 :)
+    'err:FOAP0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFOAP0001',
+    'err:FOAR0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFOAR0001',
+    'err:FOAR0002':'https://www.w3.org/TR/xpath-functions-31/#ERRFOAR0002',
+    'err:FOAY0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFOAY0001',
+    'err:FOAY0002':'https://www.w3.org/TR/xpath-functions-31/#ERRFOAY0002',
+    'err:FOCA0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFOCA0001',
+    'err:FOCA0002':'https://www.w3.org/TR/xpath-functions-31/#ERRFOCA0002',
+    'err:FOCA0003':'https://www.w3.org/TR/xpath-functions-31/#ERRFOCA0003',
+    'err:FOCA0005':'https://www.w3.org/TR/xpath-functions-31/#ERRFOCA0005',
+    'err:FOCA0006':'https://www.w3.org/TR/xpath-functions-31/#ERRFOCA0006',
+    'err:FOCH0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFOCH0001',
+    'err:FOCH0002':'https://www.w3.org/TR/xpath-functions-31/#ERRFOCH0002',
+    'err:FOCH0003':'https://www.w3.org/TR/xpath-functions-31/#ERRFOCH0003',
+    'err:FOCH0004':'https://www.w3.org/TR/xpath-functions-31/#ERRFOCH0004',
+    'err:FODC0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFODC0001',
+    'err:FODC0002':'https://www.w3.org/TR/xpath-functions-31/#ERRFODC0002',
+    'err:FODC0003':'https://www.w3.org/TR/xpath-functions-31/#ERRFODC0003',
+    'err:FODC0004':'https://www.w3.org/TR/xpath-functions-31/#ERRFODC0004',
+    'err:FODC0005':'https://www.w3.org/TR/xpath-functions-31/#ERRFODC0005',
+    'err:FODC0006':'https://www.w3.org/TR/xpath-functions-31/#ERRFODC0006',
+    'err:FODC0010':'https://www.w3.org/TR/xpath-functions-31/#ERRFODC0010',
+    'err:FODF1280':'https://www.w3.org/TR/xpath-functions-31/#ERRFODF1280',
+    'err:FODF1310':'https://www.w3.org/TR/xpath-functions-31/#ERRFODF1310',
+    'err:FODT0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFODT0001',
+    'err:FODT0002':'https://www.w3.org/TR/xpath-functions-31/#ERRFODT0002',
+    'err:FODT0003':'https://www.w3.org/TR/xpath-functions-31/#ERRFODT0003',
+    'err:FOER0000':'https://www.w3.org/TR/xpath-functions-31/#ERRFOER0000',
+    'err:FOFD1340':'https://www.w3.org/TR/xpath-functions-31/#ERRFOFD1340',
+    'err:FOFD1350':'https://www.w3.org/TR/xpath-functions-31/#ERRFOFD1350',
+    'err:FOJS0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFOJS0001',
+    'err:FOJS0003':'https://www.w3.org/TR/xpath-functions-31/#ERRFOJS0003',
+    'err:FOJS0004':'https://www.w3.org/TR/xpath-functions-31/#ERRFOJS0004',
+    'err:FOJS0005':'https://www.w3.org/TR/xpath-functions-31/#ERRFOJS0005',
+    'err:FOJS0006':'https://www.w3.org/TR/xpath-functions-31/#ERRFOJS0006',
+    'err:FOJS0007':'https://www.w3.org/TR/xpath-functions-31/#ERRFOJS0007',
+    'err:FONS0004':'https://www.w3.org/TR/xpath-functions-31/#ERRFONS0004',
+    'err:FONS0005':'https://www.w3.org/TR/xpath-functions-31/#ERRFONS0005',
+    'err:FOQM0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFOQM0001',
+    'err:FOQM0002':'https://www.w3.org/TR/xpath-functions-31/#ERRFOQM0002',
+    'err:FOQM0003':'https://www.w3.org/TR/xpath-functions-31/#ERRFOQM0003',
+    'err:FOQM0005':'https://www.w3.org/TR/xpath-functions-31/#ERRFOQM0005',
+    'err:FOQM0006':'https://www.w3.org/TR/xpath-functions-31/#ERRFOQM0006',
+    'err:FORG0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFORG0001',
+    'err:FORG0002':'https://www.w3.org/TR/xpath-functions-31/#ERRFORG0002',
+    'err:FORG0003':'https://www.w3.org/TR/xpath-functions-31/#ERRFORG0003',
+    'err:FORG0004':'https://www.w3.org/TR/xpath-functions-31/#ERRFORG0004',
+    'err:FORG0005':'https://www.w3.org/TR/xpath-functions-31/#ERRFORG0005',
+    'err:FORG0006':'https://www.w3.org/TR/xpath-functions-31/#ERRFORG0006',
+    'err:FORG0008':'https://www.w3.org/TR/xpath-functions-31/#ERRFORG0008',
+    'err:FORG0009':'https://www.w3.org/TR/xpath-functions-31/#ERRFORG0009',
+    'err:FORG0010':'https://www.w3.org/TR/xpath-functions-31/#ERRFORG0010',
+    'err:FORX0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFORX0001',
+    'err:FORX0002':'https://www.w3.org/TR/xpath-functions-31/#ERRFORX0002',
+    'err:FORX0003':'https://www.w3.org/TR/xpath-functions-31/#ERRFORX0003',
+    'err:FORX0004':'https://www.w3.org/TR/xpath-functions-31/#ERRFORX0004',
+    'err:FOTY0012':'https://www.w3.org/TR/xpath-functions-31/#ERRFOTY0012',
+    'err:FOTY0013':'https://www.w3.org/TR/xpath-functions-31/#ERRFOTY0013',
+    'err:FOTY0014':'https://www.w3.org/TR/xpath-functions-31/#ERRFOTY0014',
+    'err:FOTY0015':'https://www.w3.org/TR/xpath-functions-31/#ERRFOTY0015',
+    'err:FOUT1170':'https://www.w3.org/TR/xpath-functions-31/#ERRFOUT1170',
+    'err:FOUT1190':'https://www.w3.org/TR/xpath-functions-31/#ERRFOUT1190',
+    'err:FOUT1200':'https://www.w3.org/TR/xpath-functions-31/#ERRFOUT1200',
+    'err:FOXT0001':'https://www.w3.org/TR/xpath-functions-31/#ERRFOXT0001',
+    'err:FOXT0002':'https://www.w3.org/TR/xpath-functions-31/#ERRFOXT0002',
+    'err:FOXT0003':'https://www.w3.org/TR/xpath-functions-31/#ERRFOXT0003',
+    'err:FOXT0004':'https://www.w3.org/TR/xpath-functions-31/#ERRFOXT0004',
+    'err:FOXT0006':'https://www.w3.org/TR/xpath-functions-31/#ERRFOXT0006'
 };

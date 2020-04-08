@@ -1,9 +1,26 @@
 xquery version "3.1";
 
 import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "api-problem.xqm";
+import module namespace templates = "http://exist-db.org/xquery/templates";
+import module namespace console="http://exist-db.org/xquery/console";
 
 declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
 declare namespace hc="http://expath.org/ns/http-client";
+
+declare function local:render-template($template, $api-problem) {
+  
+let $config := map {
+    $templates:CONFIG_APP_ROOT : '/db/apps/api-problem/tests/'
+}
+
+let $lookup := function($functionName as xs:string, $arity as xs:int) {
+    function-lookup(xs:QName($functionName), $arity)
+    (: we have a catch all elsewhere :)
+}
+
+return
+    templates:apply($template, $lookup, map {$api-problem:DATA: $api-problem}, $config)
+};
 
 declare function local:respond() {
     let $parsed := if (exists(request:get-attribute('org.exist.forward.error'))) 
@@ -11,17 +28,27 @@ declare function local:respond() {
            else if (exists(request:get-attribute('javax.servlet.error.message')))
              then local:parse-javax-message(request:get-attribute('javax.servlet.error.message'))
              else local:empty-is-probably-401(),
+(:        $log := console:log($parsed),:)
+        $template := request:get-data()/*,
+        $should-render := (
+          $template instance of element() and $template/namespace-uri() = 'http://www.w3.org/1999/xhtml' and
+          matches(request:get-header('Accept'), 'application/xhtml\+xml')),
         $api-problem := api-problem:error-handler($parsed('code'), $parsed('description'), '', $parsed('module'), $parsed('line-number'), $parsed('column-number'), $parsed('additional'), request:get-header('Accept'), request:get-header("Origin")),
+(:        $log := console:log($api-problem[1]),:)
         $status := response:set-status-code($api-problem[1]/hc:response/@status),
         $headers := for $header in $api-problem[1]/hc:response/hc:header[not(@name=('Content-Type'))] return response:set-header($header/@name, $header/@value),
-        $output := if ($api-problem[1]/output:serialization-parameters/output:method[@value = 'json'])
-          then serialize($api-problem[2], map{'method': 'json'})
-          else $api-problem[2],
-        $serialization-options := if ($api-problem[1]/output:serialization-parameters/output:method[@value = 'json'])
-          then 'method=text'
-          else string-join(for $param in $api-problem[1]/output:serialization-parameters/* return concat($param/local-name(), '=', $param/@value), ' '),
-        $serialization-options := $serialization-options||' media-type='||$api-problem[1]/hc:response/hc:header[@name='Content-Type']/@value
-    return response:stream($output, $serialization-options)
+        $output := switch (true())
+          case $api-problem[1]/output:serialization-parameters/output:method/@value/data() = 'json' return serialize($api-problem[2], map{'method': 'json'})
+          case $should-render return (response:set-header('Content-Type', 'text/html'), local:render-template($template, $api-problem[2]))
+          default return $api-problem[2],
+        $serialization-options := switch (true())
+          case $api-problem[1]/output:serialization-parameters/output:method/@value/data() = 'json' return 'method=text'
+          case $should-render return 'method=xhtml'
+          default return string-join(for $param in $api-problem[1]/output:serialization-parameters/* return concat($param/local-name(), '=', $param/@value), ' '),
+        $serialization-options := if ($should-render) then $serialization-options||' media-type=text/html'
+          else $serialization-options||' media-type='||$api-problem[1]/hc:response/hc:header[@name='Content-Type']/@value
+(:      , $log := (console:log($output), console:log($serialization-options)):)
+    return response:stream($output,  $serialization-options)
 (:      return local:debug-out($api-problem[1], $output, $parsed, $serialization-options||'&#x0a;'||string-join(for $header in $api-problem[1]/hc:response/hc:header return $header/@name||'='||$header/@value, '&#x0a;')):)
 };
 
@@ -86,7 +113,7 @@ declare function local:debug-out($api-problem-1 as item(), $output, $parsed, $se
                 <h1>Resource not found</h1> 
                 <p>{request:get-uri()} does not exist</p>
                 <h2>Parsed</h2>
-                <p>{(
+                {(
                     <ul>
                         <li>code: {$parsed('code')}</li>
                         <li>description: {$parsed('description')}</li>
@@ -103,58 +130,55 @@ declare function local:debug-out($api-problem-1 as item(), $output, $parsed, $se
                     </pre>
                     )
                    }
-                </p>
                 <h2>Controller Environment</h2>
-                <p>
                     <ul>
                         {for $name in request:attribute-names()[starts-with(., '$exist:')]
                            return <li>{$name} = {request:get-attribute($name)}</li>
                         } 
                     </ul>
-                </p>
                 <h2>Attributes</h2>
-                <p>
                     <ul>
                         {for $name in request:attribute-names()[not(starts-with(., '$exist:'))]
                            return <li>{$name} = {request:get-attribute($name)}</li>
                         }
                     </ul>
-                </p>
                 <h2>Headers</h2>
-                <p>
                     <ul>
                         {for $name in request:get-header-names()
                            return <li>{$name} = {request:get-header($name)}</li>
                         }
                     </ul>
-                </p>
                 <h2>Parameters</h2>
-                <p>
                     <ul>
                         {for $name in request:get-parameter-names()
                            return <li>{$name} = {request:get-parameter($name, ())}</li>
                         }
                     </ul>
-                </p>
                 <h2>Data</h2>
-                <p>
-                    <pre>{serialize(request:get-data())}</pre>
-                </p>
+                <pre>{serialize(request:get-data())}</pre>
             </body> 
         </html>, 
     'method=html media-type=text/html indent=no')     
 };
 
-if (request:get-attribute('org.exist.forward.error')) then
-  let $forwarded-error := try { parse-xml(request:get-attribute('org.exist.forward.error'))/* } catch err:FODC0006 { request:get-attribute('org.exist.forward.error') }
-  return if (not($forwarded-error instance of element(exception))) then
-    let $header := if ($forwarded-error instance of element()) then 
-        if (matches(request:get-header('Accept'), 'application/xhtml\+xml')) 
-        then
-          if ($forwarded-error/local-name() = 'html') then response:set-header('Content-Type', 'text/html')
-          else response:set-header('Content-Type', 'application/xml')
-        else response:set-header('Content-Type', 'application/problem+xml')
-      else response:set-header('Content-Type', 'application/problem+json')
-    return $forwarded-error
-    else local:respond()
-else local:respond()
+(: Setting a status code in an error-handler for script invocations triggers the error handler a second time.
+ : Additionally any xml returned from the first invocation is reparsed in a strange way setting lots of prefixes.
+ :)
+if (exists(request:get-attribute('org.exist.forward.error')) and
+    exists(request:get-attribute('api-problem.set-status-code.workaround')) and
+    not(exists(request:get-attribute('api-problem.set-status-code.workaround.respond')))) then
+    let $respond-in-next-invocation := request:set-attribute('api-problem.set-status-code.workaround.respond', 'true'),
+        $trigger-second-invocation := response:set-status-code(999)
+    return request:get-attribute('org.exist.forward.error')
+else
+    (: 401 responses due to exist-db's access control system act really strange.
+     : They have a fixed Content-Type and fixed unusual serialization. (forces prefixes declared here,
+     : no way tho change content type)
+     : The next lines try to at least provide the corrct body although with this kind of serialization
+     : browsers and JS libraries will not deal with this gracefully.
+     :)
+    try { local:respond() }
+    catch java:org.exist.xquery.XPathException | err:FODC0006 {
+        try { parse-xml(request:get-attribute('org.exist.forward.error')) }
+        catch err:FODC0006 {request:get-attribute('org.exist.forward.error')}
+    }
