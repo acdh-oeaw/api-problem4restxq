@@ -56,7 +56,9 @@ declare function _:or_result($start-time as xs:time, $api-function as function(*
 
 declare %private function _:code_to_instance_uri($code as xs:QName) as xs:string {
     if (exists($_:problem_qname_to_uri(xs:string($code)))) then $_:problem_qname_to_uri(xs:string($code))
-    else namespace-uri-from-QName($code)||'/'||local-name-from-QName($code)
+    else if (namespace-uri-from-QName($code))
+        then namespace-uri-from-QName($code)||'/'||local-name-from-QName($code)
+        else xs:string($code)
 };
 
 declare %private function _:get_serialization_method($ret as item()) as map(xs:string, xs:string) {
@@ -119,7 +121,7 @@ declare
 function _:error-handler($code as xs:string, $description, $value, $module, $line-number, $column-number, $additional, $accept, $origin) {
         let $start-time := util:system-time(),
             $origin := $origin,
-            $code := try { xs:string(xs:QName($code)) } catch * { 'response-codes:_500' },
+            $code-as-QName := try { xs:QName($code) } catch * { 'response-codes:_500' },
             $status-code := 
           let $status-code-from-local-name := replace(local-name-from-QName(xs:QName($code)), '_', '')
           return if ($status-code-from-local-name castable as xs:integer and 
@@ -131,10 +133,10 @@ function _:error-handler($code as xs:string, $description, $value, $module, $lin
                            $additional, 'ERROR'))
         return _:return_problem($start-time,
                 <problem xmlns="urn:ietf:rfc:7807">
-                    <type>{namespace-uri-from-QName(xs:QName($code))}</type>
-                    <title>{xs:string($code)}: {$description}</title>
+                    <type>{namespace-uri-from-QName($code-as-QName)}</type>
+                    <title>{$code}: {$description}</title>
                     <detail>{$value}</detail>
-                    <instance>{_:code_to_instance_uri(xs:QName($code))}</instance>
+                    <instance>{_:code_to_instance_uri($code-as-QName)}</instance>
                     <status>{$status-code}</status>
                     {if ($_:enable_trace) then <trace xml:space="preserve">&#x0a;{$additional}</trace> else ()}
                 </problem>, $accept, if (exists($origin)) then map{"Access-Control-Allow-Origin": $origin,

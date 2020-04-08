@@ -8,7 +8,8 @@ declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
 declare namespace hc="http://expath.org/ns/http-client";
 
 declare function local:render-template($template, $api-problem) {
-  
+
+console:log('Using api-problem in template rendering.'),  
 let $config := map {
     $templates:CONFIG_APP_ROOT : '/db/apps/api-problem/tests/'
 }
@@ -75,20 +76,22 @@ declare function local:parse-javax-message($message as xs:string?) as map(*) {
 };
 
 declare function local:parse-exception-forward($exception as element(exception)) as map(*) {
-    let $res := analyze-string($exception/message, '([^:]+:[^ ]+)\s(.+)( \[at line (\d+), column (\d+)(, source: ([^\[]+))?\])(&#x0a;In function:(&#x0a;.*))?', 'sm'),
+    let $res := analyze-string($exception/message, '(([^:]+:)?[^ ]+)\s(.+)( \[at line (\d+), column (\d+)(, source: ([^\[]+))?\])(&#x0a;In function:(&#x0a;.*))?', 'sm'),
         $module := xs:string($exception/path)
     return map {
     'code': if (exists($res//*:group[@nr=1])) 
             then xs:string($res//*:group[@nr=1])
-            else concat('response-codes:_',request:get-attribute('javax.servlet.error.status_code')),
+            else if (request:get-attribute('javax.servlet.error.status_code') castable as xs:integer)
+              then concat('response-codes:_',request:get-attribute('javax.servlet.error.status_code'))
+              else 'response-codes:_500',
     'description': if (exists($res//*:group[@nr=1])) 
-                   then xs:string($res//*:group[@nr=2])
+                   then xs:string($res//*:group[@nr=3])
                    else xs:string($exception/message),
     'value': serialize($res),
     'module': $module,
-    'line-number': if (exists($res//*:group[@nr=4])) then xs:string($res//*:group[@nr=4]) else 0,
-    'column-number': if (exists($res//*:group[@nr=5])) then xs:string($res//*:group[@nr=5]) else 0,
-    'additional': api-problem:fix-stack(tokenize($res//*:group[@nr=9], '&#x0a;'), $module, $res//*:group[@nr=4], $res//*:group[@nr=5])
+    'line-number': if (exists($res//*:group[@nr=5])) then xs:string($res//*:group[@nr=5]) else 0,
+    'column-number': if (exists($res//*:group[@nr=6])) then xs:string($res//*:group[@nr=6]) else 0,
+    'additional': api-problem:fix-stack(tokenize($res//*:group[@nr=10], '&#x0a;'), $module, $res//*:group[@nr=5], $res//*:group[@nr=6])
   }    
 };
 
