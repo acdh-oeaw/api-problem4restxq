@@ -12,7 +12,7 @@
         <p>The following test paths are avaliable
             <ul>
               <li>
-                    <a href="tests/test1">test1</a>
+                    <a href="tests/test1">test1</a> A somewhat rare error from the standard (402) raised in RestXQ
                 </li>
               <li>
                     <a href="tests/test2">test2</a>
@@ -21,16 +21,19 @@
                     <a href="tests/test3">test3</a>
                 </li>
               <li>
-                    <a href="tests/test4">test4</a> | <a href="tests/test2.html">using templates</a>
+                    <a href="tests/test4">test4</a> | <a href="tests/test2.html">using templates</a> | <a href="tests-with-catch/test2.html">using templates error processed in view.xql</a>
                 </li>
               <li>
                     <a href="tests/test5">test5</a> (needs catch-all-handler as error-page)
                 </li>
               <li>
-                    <a href="tests/test6">test6</a> | <a href="tests/test.html">using templates</a>
+                    <a href="tests/test6">test6</a> | <a href="tests/test.html">using templates</a> | <a href="tests-with-catch/test.html">using templates error processed in view.xql</a>
                 </li>
               <li>
                     <a href="tests/test7">test7</a>
+                </li>
+              <li>
+                    <a href="tests/test8">test8</a> | <a href="tests-with-catch/test3.html">using templates error processed in view.xql</a>
                 </li>
                <li>
                   <a href="tests/generic-error-in-restxq">Generic error handler triggerd by RestXQ</a> (needs catch-all-handler as error-page)
@@ -40,9 +43,9 @@
                 </li>
             </ul>
             <p>
-              <a href="doesntexist.html">404 error response triggered by controller.xql</a>
+              404 <a href="doesntexist.html">error response as fall through in controller.xql</a>
                     <br/>
-              <a href="tests/access-denied.html">401 (if you don't provide username and password) but does not work well</a>
+              401 <a href="tests/access-denied.html">in a vanilla view.xql</a> | <a href="tests-with-catch/access-denied.html">in a view.xql that catches and processes other errors</a> (if you don't provide username and password) 
             </p>
         </p>
         </div>

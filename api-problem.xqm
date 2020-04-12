@@ -3,15 +3,30 @@ xquery version "3.1";
 module namespace _ = "https://tools.ietf.org/html/rfc7807";
 import module namespace req = "http://exquery.org/ns/request";
 import module namespace console = "http://exist-db.org/xquery/console";
+import module namespace insepct = "http://exist-db.org/xquery/inspection";
 import module namespace util = "http://exist-db.org/xquery/util";
 
 declare namespace rfc7807 = "urn:ietf:rfc:7807";
 declare namespace response-codes = "https://tools.ietf.org/html/rfc7231#section-6";
 declare namespace rest = "http://exquery.org/ns/restxq";
 declare namespace http = "http://expath.org/ns/http-client";
+declare namespace output="http://www.w3.org/2010/xslt-xquery-serialization";
 
 declare variable $_:enable_trace external := true();
+(: A field in $model that contains the generated api-problem as XML. :)
 declare variable $_:DATA := 'api-problem.data';
+(: A field in $err:value if it is a map(*) that contains the stack trace
+ : of caught nested errors as xs:string sequence. :)
+declare variable $_:ADDITIONAL_STACK_TRACE := 'api-problem.additional-stack-trace';
+(: A field in $err:value if it is a map(*) that contains the error codes
+ : of caught nested errors as xs:string sequence. :)
+declare variable $_:ADDITIONAL_ERROR_CODES := 'api-problem.error-codes';
+(: A field in $err:value if it is a map(*) that contains the descriptions
+ : of caught nested errors as xs:string sequence. :)
+declare variable $_:ADDITIONAL_DESCRIPTIONS := 'api-problem.descriptions';
+(: A field in $err:value if it is a map(*) that contains the java stack trace
+ : of a caught nested error from java-bindings. :)
+declare variable $_:JAVA_STACK_TRACE := 'api-problem.java-stack-trace';
 
 declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*), $accept as xs:string?) as item()+ {
     _:or_result($start-time, $api-function, $parameters, $accept, (), ())
@@ -31,34 +46,72 @@ declare function _:or_result($start-time as xs:time, $api-function as function(*
           _:inject-runtime($start-time, $ret)
           )
     } catch * {
-        let $fixed-stack := _:fix-stack($exerr:xquery-stack-trace, $err:module, $err:line-number, $err:column-number),
-            $status-code := if (namespace-uri-from-QName($err:code) eq 'https://tools.ietf.org/html/rfc7231#section-6') then
-          let $status-code-from-local-name := replace(local-name-from-QName($err:code), '_', '')
+        _:problem-from-catch-vars($start-time, $err:code, $err:description, $err:value, $err:module, $err:line-number, $err:column-number, $exerr:xquery-stack-trace, $exerr:java-stack-trace, $accept, $header-elements)
+    }
+};
+
+declare %private function _:problem-from-catch-vars($start-time as xs:time, $code, $description, $value, $module, $line-number, $column-number, $stack-trace, $java-stack-trace, $accept as xs:string, $header-elements as map(xs:string, xs:string)?) {
+        let $fixed-stack := _:fix-stack($stack-trace, $value, $module, $line-number, $column-number),
+            $codes := if ($value instance of map(*)) then ($value($_:ADDITIONAL_ERROR_CODES), $code) else $code,
+            $java-stack-trace := if (namespace-uri-from-QName($codes[1]) = 'http://exist.sourceforge.net/NS/exist/java-binding')
+               then '&#x0a;'||string-join(if ($value instance of map(*) and exists($value($_:JAVA_STACK_TRACE))) then $value($_:JAVA_STACK_TRACE) else $java-stack-trace, '&#x0a;') else '',
+            $descriptions := if ($value instance of map(*)) then ($value($_:ADDITIONAL_DESCRIPTIONS), $description) else $description,
+            $status-code := if (namespace-uri-from-QName($codes[1]) eq 'https://tools.ietf.org/html/rfc7231#section-6') then
+          let $status-code-from-local-name := replace(local-name-from-QName($code), '_', '')
           return if ($status-code-from-local-name castable as xs:integer and 
                      xs:integer($status-code-from-local-name) > 400 and
                      xs:integer($status-code-from-local-name) < 511) then xs:integer($status-code-from-local-name) else 400
         else (500, _:write-log('Program error: returning 500'||'&#x0a;'||
-                               namespace-uri-from-QName($err:code)||':'||local-name-from-QName($err:code)||'&#x0a;'||
-                               $err:description||'&#x0a;'||
-                               '['||$err:line-number||':'||$err:column-number||':'||$err:module||']&#x0a;'||
-                               string-join($exerr:xquery-stack-trace, '&#x0a;'), 'ERROR'))
+                               namespace-uri-from-QName($codes[1])||':'||local-name-from-QName($codes[1])||'&#x0a;'||
+                               string-join($descriptions, ' > ')||'&#x0a;'||$fixed-stack||$java-stack-trace, 'ERROR'))
         return _:return_problem($start-time,
                 <problem xmlns="urn:ietf:rfc:7807">
-                    <type>{namespace-uri-from-QName($err:code)}</type>
-                    <title>{xs:string($err:code)}: {$err:description}</title>
-                    <detail>{$err:value}</detail>
-                    <instance>{_:code_to_instance_uri($err:code)}</instance>
+                    <type>{namespace-uri-from-QName($codes[1])}</type>
+                    <title>{string-join($codes, ' > ')}: {string-join($descriptions, ' > ')}</title>
+                    <detail>{_:format_err_value($value)}</detail>
+                    <instance>{_:code_to_instance_uri($codes[1])}</instance>
                     <status>{$status-code}</status>
-                    {if ($_:enable_trace) then <trace>&#x0a;{$fixed-stack}</trace> else ()}
-                </problem>, $accept, $header-elements)     
-    }
+                    {if ($_:enable_trace) then <trace>&#x0a;{$fixed-stack}{$java-stack-trace}</trace> else ()}
+                </problem>, $accept, $header-elements)   
 };
 
 declare %private function _:code_to_instance_uri($code as xs:QName) as xs:string {
     if (exists($_:problem_qname_to_uri(xs:string($code)))) then $_:problem_qname_to_uri(xs:string($code))
-    else if (namespace-uri-from-QName($code))
-        then namespace-uri-from-QName($code)||'/'||local-name-from-QName($code)
+    else
+      let $ns-uri := namespace-uri-from-QName($code)
+      return if ($ns-uri)
+        then $ns-uri||(if (ends-with($ns-uri, '/')) then '' else '/')||local-name-from-QName($code)
         else xs:string($code)
+};
+
+declare %private function _:format_err_value($value) {
+  if ($value instance of map(*))
+    then let $value := map:remove($value, ($_:ADDITIONAL_STACK_TRACE, $_:ADDITIONAL_ERROR_CODES, $_:ADDITIONAL_DESCRIPTIONS, $_:JAVA_STACK_TRACE))
+    return try { if (count(map:keys($value)) > 1 or ($value?* instance of map(*))) then serialize($value, map {'method': 'json'}) else $value?*}
+    catch exerr:SENR0001 { serialize(map:merge(map:for-each(map:remove($value, $_:ADDITIONAL_STACK_TRACE), _:replace_functions#2)), map {'method': 'json'}) }
+  else $value
+};
+
+declare %private function _:replace_functions($key as xs:anyAtomicType, $value as item()*) {
+    switch (true())
+    case $value instance of map(*) return map {$key: map:merge(map:for-each($value, _:replace_functions#2))}
+    case $value instance of function(*)* return map {$key: for $v in $value return try { _:render_function_as_string(inspect:inspect-function($v)) } catch * { 'function()' }}
+    default return map {$key: $value}
+};
+
+declare %private function _:render_function_as_string($f as element(function)) as xs:string {
+  let $translate_cardinality := map {
+    'exactly one': '',
+    'zero or more': '*',
+    'one or more': '+',
+    'zero or one': '?'
+  },
+      $module := if (exists($f/@module)) then data($f/@module)||': ' else '',
+      $name := if (exists($f/@name)) then ' '||data($f/@name) else '',
+      $annotations := if (exists($f/annotation)) then '%'||string-join($f/annotation/@name, ' %')||' ' else '',
+      $args := if (exists($f/argument)) then '$'||string-join($f/argument!(data(./@var)||' as '||data(./@type)||$translate_cardinality(data(./@cardinality))), ', $') else '', 
+      $returns := if (exists($f/returns)) then ' as '||data($f/returns/@type)||$translate_cardinality(data($f/returns/@cardinality)) else ''
+  return $annotations||'function'||$name||'('||$args||')'||$returns  
 };
 
 declare %private function _:get_serialization_method($ret as item()) as map(xs:string, xs:string) {
@@ -88,10 +141,44 @@ declare %private function _:return_result($to_return as node()) {
   $to_return
 };
 
+(: to be called from a catch * block like:
+ : error(xs:QName('err:error-again'),
+ :   'Catch and error',
+ :   map:merge(
+ :    (map{'additional': 'data'},
+ :     api-problem:pass($err:code, $err:description, $err:value, $exerr:xquery-stack-trace))
+ :   )
+ : )
+ :)
+
+declare function _:pass($code as xs:QName, $description as xs:string?, $value as item()*, $stack-trace as xs:string*) as map(*) {
+    _:pass($code, $description, $value, $stack-trace, ()) 
+};
+
+declare function _:pass($code as xs:QName, $description as xs:string?, $value as item()*, $stack-trace as xs:string*, $java-stack-trace as xs:string*) as map(*) {
+  if ($value instance of map(*)) then
+      map:merge(($value,
+      map {
+            $_:ADDITIONAL_STACK_TRACE: ($value($_:ADDITIONAL_STACK_TRACE), $stack-trace),
+            $_:ADDITIONAL_ERROR_CODES: ($value($_:ADDITIONAL_ERROR_CODES), $code),
+            $_:ADDITIONAL_DESCRIPTIONS: ($value($_:ADDITIONAL_DESCRIPTIONS), $description)
+        },
+      if (namespace-uri-from-QName($code) = 'http://exist.sourceforge.net/NS/exist/java-binding')
+      then map { $_:JAVA_STACK_TRACE: $java-stack-trace } else ()))
+  else map:merge((map {
+            $_:ADDITIONAL_STACK_TRACE: $stack-trace,
+            $_:ADDITIONAL_ERROR_CODES: $code,
+            $_:ADDITIONAL_DESCRIPTIONS: $description,
+            '': $value
+        },
+      if (namespace-uri-from-QName($code) = 'http://exist.sourceforge.net/NS/exist/java-binding')
+      then map { $_:JAVA_STACK_TRACE: $java-stack-trace } else ()))
+};
+
 declare %private function _:inject-runtime($start as xs:time, $ret) {
   if ($ret instance of map(*)) then map:merge(($ret, map {'took': _:runtime($start)}))
-  else if ($ret instance of element(json)) then <json>{($ret/(@*, *), <took>{_:runtime($start)}</took>)}</json>
-  else if ($ret instance of element(rfc7807:problem)) then <problem xmlns="urn:ietf:rfc:7807">{($ret/(@*, *), <took>{_:runtime($start)}</took>)}</problem>
+  else if ($ret instance of element(json) and not($ret/*:took)) then <json>{($ret/(@*, *), <took>{_:runtime($start)}</took>)}</json>
+  else if ($ret instance of element(rfc7807:problem) and not($ret/*:took)) then <problem xmlns="urn:ietf:rfc:7807">{($ret/(@*, *), <took>{_:runtime($start)}</took>)}</problem>
   else $ret
 };
 
@@ -117,34 +204,39 @@ declare
  : function _:example($accept as xs:string*) {
  :   api-problem:or_result(util:system-time(), _:actual#0, [], string-join($accept, ','))
  : };
+ : If you want to use this in a view.xql and get additional information in detail use this:
+ :  try {
+ :      templates:apply($content, $lookup, () $config)
+ :  } catch * {
+ :      let $api-problem := api-problem:error-handler(
+ :            $err:code, $err:description, $err:value, 
+ :            $err:module, $err:line-number, $err:column-number,
+ :            api-problem:fix-stack($exerr:xquery-stack-trace, $err:module, $err:line-number, $err:column-number),
+ :            'application/xhtml+xml', ''),
+ :          $content := doc($config:app-root||'/templates/error-page.html')
+ :      return templates:apply($content, $lookup, map {$api-problem:DATA: $api-problem[2]}, $config)
+ :  }
  :)
-function _:error-handler($code as xs:string, $description, $value, $module, $line-number, $column-number, $additional, $accept, $origin) {
-        let $start-time := util:system-time(),
-            $origin := $origin,
-            $code-as-QName := try { xs:QName($code) } catch * { 'response-codes:_500' },
-            $status-code := 
-          let $status-code-from-local-name := replace(local-name-from-QName(xs:QName($code)), '_', '')
-          return if ($status-code-from-local-name castable as xs:integer and 
-                     xs:integer($status-code-from-local-name) >= 400 and
-                     xs:integer($status-code-from-local-name) < 511) then xs:integer($status-code-from-local-name) else
-                     (500, _:write-log('Program error: returning 500'||'&#x0a;'||
-                           namespace-uri-from-QName(xs:QName($code))||':'||local-name-from-QName(xs:QName($code))||'&#x0a;'||
-                           $description||'&#x0a;'||
-                           $additional, 'ERROR'))
-        return _:return_problem($start-time,
-                <problem xmlns="urn:ietf:rfc:7807">
-                    <type>{namespace-uri-from-QName($code-as-QName)}</type>
-                    <title>{$code}: {$description}</title>
-                    <detail>{$value}</detail>
-                    <instance>{_:code_to_instance_uri($code-as-QName)}</instance>
-                    <status>{$status-code}</status>
-                    {if ($_:enable_trace) then <trace xml:space="preserve">&#x0a;{$additional}</trace> else ()}
-                </problem>, $accept, if (exists($origin)) then map{"Access-Control-Allow-Origin": $origin,
-                                "Access-Control-Allow-Credentials": "true"} else ())  
+function _:error-handler($code, $description as xs:string?, $value, $module as xs:string?, $line-number as xs:integer?, $column-number as xs:integer?, $stack-trace as xs:string*, $java-stack-trace as xs:string*, $accept, $origin) {
+    let $start-time := util:system-time(),
+        $origin := $origin,
+        $header-elements := if (exists($origin)) then map{"Access-Control-Allow-Origin": $origin,
+                                "Access-Control-Allow-Credentials": "true"} else ()
+    return if ($value instance of element()+ and $value[2] instance of element(rfc7807:problem)) 
+    then _:return_problem($start-time, $value[2], $accept, $header-elements)
+    else try {
+        let $code-as-QName := try { if ($code instance of xs:QName) then $code else xs:QName($code) } catch * { xs:QName('response-codes:_500') }
+        return _:problem-from-catch-vars($start-time, $code-as-QName, $description, $value, $module, $line-number, $column-number, $stack-trace, $java-stack-trace, $accept, $header-elements)
+    } catch * {
+        let $fixed-stack := _:fix-stack($exerr:xquery-stack-trace, $err:value, $err:module, $err:line-number, $err:column-number)
+        return (_:write-log('Error in error-handler: '||$err:code||' '||$err:description||' '||$fixed-stack, 'ERROR'),
+        error(xs:QName('_:error-handler'), $err:code||' '||$err:description||' '||$fixed-stack))
+    }
 };
 
-declare function _:fix-stack($raw-stack as xs:string*, $module as xs:string?, $line-number as xs:integer?, $column-number as xs:integer?) as xs:string? {
-  if (empty($raw-stack)) then '??? '||'['||$line-number||':'||$column-number||':'||$module||']'
+declare function _:fix-stack($raw-stack as xs:string*, $value, $module as xs:string?, $line-number as xs:integer?, $column-number as xs:integer?) as xs:string? {
+  let $raw-stack := ((if ($value instance of map(*)) then $value($_:ADDITIONAL_STACK_TRACE) else ()), $raw-stack)
+  return if (empty($raw-stack)) then '??? '||'['||$line-number||':'||$column-number||':'||$module||']'
   else let $trace-lines := (
         map {
             'line': $line-number,
@@ -259,12 +351,40 @@ return <rest:response xmlns:rest="http://exquery.org/ns/restxq">
 </rest:response>
 };
 
+declare function _:set-status-and-headers-like-restxq($restxq-header as element()) as empty-sequence() {
+    (response:set-status-code($restxq-header/http:response/@status),
+     for $header in $restxq-header/http:response/http:header[not(@name=('Content-Type'))] return response:set-header($header/@name, $header/@value))
+};
+
+declare function _:render-output-according-to-accept($accept as xs:string, $template, $api-problem-restxq as item()+, $render-function as function(element(), element(rfc7807:problem)) as item()* ) as item()* {
+    let $template := if ($template instance of document-node()) then $template/* else $template,
+        $should-render := (
+          $template instance of element() and $template/namespace-uri() = 'http://www.w3.org/1999/xhtml' and
+          matches($accept, 'application/xhtml\+xml'))
+(:      , $log := console:log($api-problem[1]):)
+    return switch (true())
+          case $api-problem-restxq[1]/output:serialization-parameters/output:method/@value/data() = 'json' return serialize($api-problem-restxq[2], map{'method': 'json'})
+          case $should-render return (response:set-header('Content-Type', 'text/html'), $render-function($template, $api-problem-restxq[2]))
+          default return $api-problem-restxq[2]
+};
+
+declare function _:get-stream-serialization-options($output, $api-problem-restxq) as xs:string {
+    let $is-html := $output instance of element() and $output/namespace-uri() = 'http://www.w3.org/1999/xhtml',
+        $serialization-options := switch (true())
+          case $api-problem-restxq[1]/output:serialization-parameters/output:method/@value/data() = 'json' return 'method=text'
+          case $is-html return 'method=xhtml'
+          default return string-join(for $param in $api-problem-restxq[1]/output:serialization-parameters/* return concat($param/local-name(), '=', $param/@value), ' ')
+        return if ($is-html)
+          then $serialization-options||' media-type=text/html'
+          else $serialization-options||' media-type='||$api-problem-restxq[1]/hc:response/hc:header[@name='Content-Type']/@value
+};
+
 declare function _:as_html_pre($node as node(), $model as map(*)) {
-  <pre xmlns="http://www.w3.org/1999/xhtml">{serialize($model($_:DATA), map{'indent': true()})}</pre>  
+  <pre xmlns="http://www.w3.org/1999/xhtml">{($node/@*, serialize($model($_:DATA), map{'indent': true()}))}</pre>  
 };
 
 declare function _:trace_as_pre($node as node(), $model as map(*)) {
-  <pre xmlns="http://www.w3.org/1999/xhtml">{$model($_:DATA)/rfc7807:trace/text()}</pre>  
+  <pre xmlns="http://www.w3.org/1999/xhtml">{($node/@*, $model($_:DATA)/rfc7807:trace/text())}</pre>  
 };
 
 declare function _:type($node as node(), $model as map(*)) {
@@ -280,7 +400,7 @@ declare function _:instance($node as node(), $model as map(*)) {
 };
 
 declare function _:instance_as_link($node as node(), $model as map(*), $link-text as xs:string) {
-  <a href="{$model($_:DATA)/rfc7807:instance}">{$node/@target}{$link-text}</a>
+  <a href="{$model($_:DATA)/rfc7807:instance}">{($node/@*, $link-text)}</a>
 };
 
 declare function _:title($node as node(), $model as map(*)) {
@@ -288,6 +408,30 @@ declare function _:title($node as node(), $model as map(*)) {
 };
 
 declare function _:detail($node as node(), $model as map(*)) {
+  $model($_:DATA)/rfc7807:detail/text()
+};
+
+declare function _:detail-to-ul($node as node(), $model as map(*)) {
+  try { _:map-to-ul(parse-json($model($_:DATA)/rfc7807:detail/text())) }
+  catch err:FOJS0001 { $model($_:DATA)/rfc7807:title/text() }
+};
+
+declare %private function _:map-to-ul($map as map(*)) {
+  <ul xmlns="http://www.w3.org/1999/xhtml" class="api-problem detail level">
+    {for $k in map:keys($map)
+     where exists($map($k))
+     return <li><span class="api-problem detail key">{$k}</span>
+                <span class="api-problem detail value">{
+                      if ($map($k) instance of map(*)) 
+                      then  _:map-to-ul($map($k))
+                      else $map($k)}
+                </span>
+            </li>
+    }
+  </ul>
+};
+
+declare function _:detail_or_explain($node as node(), $model as map(*)) {
   if ($model($_:DATA)/rfc7807:detail/text()) then $model($_:DATA)/rfc7807:detail/text()
   else 'If the error was caught by an error-handler or error-page configuration then there are no details available, sorry.'
 };

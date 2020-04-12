@@ -125,3 +125,19 @@ function _:test7($accept as xs:string*) {
 declare %private function _:_test7() {
     test-call-stack:stack_l1(' Test1', ' Test2', ' Test3')
 };
+
+declare
+  %rest:GET
+  %rest:header-param('Accept', '{$accept}')
+  %rest:path('tests/test8')
+function _:test7($accept as xs:string*) {
+  api-problem:or_result(util:system-time(), _:_test8#0, [], string-join($accept, ','))
+};
+
+declare %private function _:_test8() {
+    test-call-stack:catch-and-error()
+};
+
+declare function _:template-test8($node as node(), $model as map(*)) {
+    test-call-stack:catch-and-error()
+};

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<div xmlns="http://www.w3.org/1999/xhtml" data-template="templates:surround" data-template-with="page.html" data-template-at="content">
+    <h1>
+        <span data-template="api-problem:status"/> Sorry, there was a problem</h1>
+    <p>This uses error reporting according to <a href="https://tools.ietf.org/html/rfc7807" target="_blank">RFC7807</a>.<br/>
+       If this is used by a web.xml error-page directive you might see this error page instead of the one in your application.<br/>
+       See catch-all-handler.xql if you need to change this.
+    </p>
+    <h2>Description</h2>
+    <p>
+        <span data-template="api-problem:title"/>
+    </p>
+    <h2>Detail</h2>
+    <p>
+        <span data-template="api-problem:detail_or_explain"/>
+    </p>
+    <h2>Error type</h2>
+    <p>
+        <span data-template="api-problem:type"/> <a data-template="api-problem:type_as_link" data-template-link-text="(see here)" target="_blank"/>
+        <br/>
+    <span data-template="api-problem:instance"/> <a data-template="api-problem:instance_as_link" data-template-link-text="(see here)" target="_blank"/>    
+    </p>
+    <h2>Stack trace</h2>
+    <pre data-template="api-problem:trace_as_pre"/>
+    <h2>The whole API problem XML</h2>
+    <pre data-template="api-problem:as_html_pre"/>
+</div>

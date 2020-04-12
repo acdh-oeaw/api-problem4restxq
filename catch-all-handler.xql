@@ -9,48 +9,70 @@ declare namespace hc="http://expath.org/ns/http-client";
 
 declare function local:render-template($template, $api-problem) {
 
-console:log('Using api-problem in template rendering.'),  
+(:console:log('Using api-problem in template rendering.'),:)
 let $config := map {
-    $templates:CONFIG_APP_ROOT : '/db/apps/api-problem/tests/'
+    $templates:CONFIG_APP_ROOT : (
+        request:get-attribute('templates.app-root'),
+        (: Needs to be hardcoded when this is called as error-page. Adjust if necessary.
+         : See $lookup and $template below.
+         :)
+        '/db/apps/api-problem/tests'
+    )[1]
 }
 
-let $lookup := function($functionName as xs:string, $arity as xs:int) {
-    function-lookup(xs:QName($functionName), $arity)
-    (: we have a catch all elsewhere :)
-}
+(:let $log := (console:log($config), console:log(request:get-attribute('templates.lookup-module'))):)
+
+(: This is a suggested method to share the template function resolver
+ : between view.xql and catch-all-handler.xql.
+ : catch-all-handler.xql gets a customize version of this module by
+ : reading the templates.lookup-module attribute and uses the first
+ : method in that module.
+ : If invoked by web.xml error-page there is a hard coded alternative.
+ :)
+
+let $lookup := (
+    if (exists(request:get-attribute('templates.lookup-module')))
+    then try {
+        inspect:module-functions(xs:anyURI(request:get-attribute('templates.lookup-module')))
+    } catch * { () }
+    else (),
+    inspect:module-functions(xs:anyURI('/db/apps/api-problem/tests/templates-lookup.xqm'))
+    )[1]
 
 return
     templates:apply($template, $lookup, map {$api-problem:DATA: $api-problem}, $config)
 };
 
-declare function local:respond() {
+declare function local:respond($accept as xs:string) {
     let $parsed := if (exists(request:get-attribute('org.exist.forward.error'))) 
-           then local:parse-exception-forward(parse-xml(request:get-attribute('org.exist.forward.error'))/*)
+           then 
+              let $forwarded-xml := parse-xml-fragment(
+                  replace(request:get-attribute('org.exist.forward.error'), '^<\?xml\sversion="1.0"\s?\?>', '', 'm') =>
+                  replace('<!DOCTYPE html>', '', 'm'))/*
+              return switch(true())
+                case $forwarded-xml instance of element(exception) return local:parse-exception-forward($forwarded-xml)
+                case $forwarded-xml instance of element()+ and $forwarded-xml[2]/local-name() = 'problem' return local:forwarded-problem($forwarded-xml) 
+                default return (
+                    console:log($forwarded-xml),
+                    error(xs:QName('local:unrecognized-xml'), 'Can not process this kind of XML: '||
+                    string-join($forwarded-xml!./local-name(), ', '))
+                )
            else if (exists(request:get-attribute('javax.servlet.error.message')))
              then local:parse-javax-message(request:get-attribute('javax.servlet.error.message'))
              else local:empty-is-probably-401(),
-(:        $log := console:log($parsed),:)
-        $template := request:get-data()/*,
-        $should-render := (
-          $template instance of element() and $template/namespace-uri() = 'http://www.w3.org/1999/xhtml' and
-          matches(request:get-header('Accept'), 'application/xhtml\+xml')),
-        $api-problem := api-problem:error-handler($parsed('code'), $parsed('description'), '', $parsed('module'), $parsed('line-number'), $parsed('column-number'), $parsed('additional'), request:get-header('Accept'), request:get-header("Origin")),
-(:        $log := console:log($api-problem[1]),:)
-        $status := response:set-status-code($api-problem[1]/hc:response/@status),
-        $headers := for $header in $api-problem[1]/hc:response/hc:header[not(@name=('Content-Type'))] return response:set-header($header/@name, $header/@value),
-        $output := switch (true())
-          case $api-problem[1]/output:serialization-parameters/output:method/@value/data() = 'json' return serialize($api-problem[2], map{'method': 'json'})
-          case $should-render return (response:set-header('Content-Type', 'text/html'), local:render-template($template, $api-problem[2]))
-          default return $api-problem[2],
-        $serialization-options := switch (true())
-          case $api-problem[1]/output:serialization-parameters/output:method/@value/data() = 'json' return 'method=text'
-          case $should-render return 'method=xhtml'
-          default return string-join(for $param in $api-problem[1]/output:serialization-parameters/* return concat($param/local-name(), '=', $param/@value), ' '),
-        $serialization-options := if ($should-render) then $serialization-options||' media-type=text/html'
-          else $serialization-options||' media-type='||$api-problem[1]/hc:response/hc:header[@name='Content-Type']/@value
-(:      , $log := (console:log($output), console:log($serialization-options)):)
-    return response:stream($output,  $serialization-options)
-(:      return local:debug-out($api-problem[1], $output, $parsed, $serialization-options||'&#x0a;'||string-join(for $header in $api-problem[1]/hc:response/hc:header return $header/@name||'='||$header/@value, '&#x0a;')):)
+(:        $log := console:log($parsed), :)
+        $template := (
+            request:get-data()/*,
+            (: As above: needs to be hardcoded when this is called as error-page. Adjust if necessary. :)
+            doc('/db/apps/api-problem/tests/error-page.html')/*
+        )[1],
+        $api-problem-restxq := api-problem:error-handler($parsed('code'), $parsed('description'), $parsed('value'), $parsed('module'), $parsed('line-number'), $parsed('column-number'), $parsed('additional'), (), $accept, request:get-header("Origin")),
+        $output := (api-problem:set-status-and-headers-like-restxq($api-problem-restxq[1]),
+          if ($accept = 'application/restxq+xml') then $api-problem-restxq
+          else api-problem:render-output-according-to-accept($accept, $template, $api-problem-restxq, local:render-template#2))
+(:      , $log := (console:log($output), api-problem:get-stream-serialization-options($output, $api-problem-restxq)):)
+    return response:stream($output,  api-problem:get-stream-serialization-options($output, $api-problem-restxq))
+(:      return local:debug-out($api-problem[1], $output, $parsed, api-problem:get-stream-serialization-options($output, $api-problem-restxq)||'&#x0a;'||string-join(for $header in $api-problem[1]/hc:response/hc:header return $header/@name||'='||$header/@value, '&#x0a;')):)
 };
 
 declare function local:parse-javax-message($message as xs:string?) as map(*) {
@@ -67,11 +89,12 @@ declare function local:parse-javax-message($message as xs:string?) as map(*) {
     'description': if (exists($res//*:group[@nr=1])) 
                    then xs:string($res//*:group[@nr=2])
                    else $message,
-    'value': serialize($res),
+    'value': request:get-attribute('api-problem.requested-filename'),
     'module': $module,
-    'line-number': if (exists($res//*:group[@nr=4])) then xs:string($res//*:group[@nr=4]) else 0,
-    'column-number': if (exists($res//*:group[@nr=5])) then xs:string($res//*:group[@nr=5]) else 0,
-    'additional': api-problem:fix-stack(tokenize($res//*:group[@nr=9], '&#x0a;'), $module, $res//*:group[@nr=4], $res//*:group[@nr=5])
+    'line-number': if (exists($res//*:group[@nr=4])) then xs:integer($res//*:group[@nr=4]) else 0,
+    'column-number': if (exists($res//*:group[@nr=5])) then xs:integer($res//*:group[@nr=5]) else 0,
+    'additional': tokenize($res//*:group[@nr=9], '&#x0a;'),
+    'analyze-string': serialize($res)
   }
 };
 
@@ -87,19 +110,31 @@ declare function local:parse-exception-forward($exception as element(exception))
     'description': if (exists($res//*:group[@nr=1])) 
                    then xs:string($res//*:group[@nr=3])
                    else xs:string($exception/message),
-    'value': serialize($res),
+    'value': '',
     'module': $module,
-    'line-number': if (exists($res//*:group[@nr=5])) then xs:string($res//*:group[@nr=5]) else 0,
-    'column-number': if (exists($res//*:group[@nr=6])) then xs:string($res//*:group[@nr=6]) else 0,
-    'additional': api-problem:fix-stack(tokenize($res//*:group[@nr=10], '&#x0a;'), $module, $res//*:group[@nr=5], $res//*:group[@nr=6])
+    'line-number': if (exists($res//*:group[@nr=5])) then xs:integer($res//*:group[@nr=5]) else 0,
+    'column-number': if (exists($res//*:group[@nr=6])) then xs:integer($res//*:group[@nr=6]) else 0,
+    'additional': tokenize($res//*:group[@nr=10], '&#x0a;'),
+    'analyze-string': serialize($res)
   }    
 };
 
-declare function local:empty-is-probably-401() {
+declare function local:forwarded-problem($forwarded-problem as element()+) as map(*) {
+  map {
+      'code': 'local:forwarded',
+      'description': '',
+      'value': $forwarded-problem,
+      'line-number': 0,
+      'column-number': 0,
+      'additional': ''
+  }  
+};
+
+declare function local:empty-is-probably-401() as map(*) {
   map {
       'code': 'response-codes:_401',
       'description': $api-problem:codes_to_message(401),
-      'value': 'Most probably 401. exist-db does not provide any data if this is the error',
+      'value': request:get-attribute('api-problem.requested-filename')||' Most probably 401. exist-db does not provide any data if this is the error',
       'line-number': 0,
       'column-number': 0,
       'additional': ''
@@ -125,6 +160,7 @@ declare function local:debug-out($api-problem-1 as item(), $output, $parsed, $se
                         <li>line-number: {$parsed('line-number')}</li>
                         <li>column-number: {$parsed('column-number')}</li>
                         <li>additional: {$parsed('additional')}</li>
+                        <li>analyze-string: {$parsed('analyze-string')}</li>
                     </ul>,
                     $serialization-options,
                     <pre>
@@ -165,23 +201,37 @@ declare function local:debug-out($api-problem-1 as item(), $output, $parsed, $se
 };
 
 (: Setting a status code in an error-handler for script invocations triggers the error handler a second time.
- : Additionally any xml returned from the first invocation is reparsed in a strange way setting lots of prefixes.
+ : Additionally any xml returned from the first invocation is reparsed in a strange way setting lots of prefixes
+ : if any (html, rfc7807) are defined in this file.
+ : 401 responses from exist-db due to insufficient access rights set in the database don't forward any message
+ : whatsoever. So guessing this situation this is also processed here into a respective rfc7807:problem
+ : and then the actual rendering with correct headers is done in a second invocation.
  :)
-if (exists(request:get-attribute('org.exist.forward.error')) and
-    exists(request:get-attribute('api-problem.set-status-code.workaround')) and
+if (((exists(request:get-attribute('org.exist.forward.error')) and
+      exists(request:get-attribute('api-problem.set-status-code.workaround'))) or
+     (empty(request:get-attribute('org.exist.forward.error')) and empty(request:get-attribute('javax.servlet.error.message')))) and
     not(exists(request:get-attribute('api-problem.set-status-code.workaround.respond')))) then
-    let $respond-in-next-invocation := request:set-attribute('api-problem.set-status-code.workaround.respond', 'true'),
-        $trigger-second-invocation := response:set-status-code(999)
-    return request:get-attribute('org.exist.forward.error')
+    let $respond-in-next-invocation := request:set-attribute('api-problem.set-status-code.workaround.respond', 'true')
+    return (
+(:        console:log("respond creating rfc7807"), :)
+        local:respond('application/restxq+xml')
+    )
 else
-    (: 401 responses due to exist-db's access control system act really strange.
-     : They have a fixed Content-Type and fixed unusual serialization. (forces prefixes declared here,
-     : no way tho change content type)
-     : The next lines try to at least provide the corrct body although with this kind of serialization
-     : browsers and JS libraries will not deal with this gracefully.
-     :)
-    try { local:respond() }
-    catch java:org.exist.xquery.XPathException | err:FODC0006 {
-        try { parse-xml(request:get-attribute('org.exist.forward.error')) }
-        catch err:FODC0006 {request:get-attribute('org.exist.forward.error')}
+    try {(
+(:        console:log("respond creating final rendering"), :)
+        local:respond(request:get-header('Accept'))
+    )}
+    catch java:org.exist.xquery.XPathException | err:FODC0006 { (::)
+        try {(
+            console:log("respond can't process in respond org.exist.forward.error "||'&#x0a;'
+            ||$err:code||' at '||$err:module||':'||$err:line-number||':'||$err:column-number||'&#x0a;'
+(:            ||string-join($exerr:xquery-stack-trace, '&#x0a;'):)
+            ||string-join($exerr:java-stack-trace, '&#x0a;')
+(:            ||request:get-attribute('org.exist.forward.error'):)
+            ), 
+            parse-xml-fragment(request:get-attribute('org.exist.forward.error'))
+        )} catch err:FODC0006 {(
+(:            console:log("org.exist.forward.error is no xml"), :)
+            request:get-attribute('org.exist.forward.error')
+        )}
     }
