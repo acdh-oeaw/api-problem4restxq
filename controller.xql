@@ -1,6 +1,4 @@
 xquery version "3.1";
-
-import module namespace test="https://tools.ietf.org/html/rfc7807/tests" at "tests/api-problem-rest-test.xqm";
             
 declare variable $exist:path external;
 declare variable $exist:resource external;
@@ -49,9 +47,9 @@ declare function local:dispatcher() {
             </forward>
         </error-handler>
       </dispatch>
-    case $exist:path = '/tests/test.xq' return
+    case $exist:path = ('/tests/test.xq', '/openapi.json') return
       <dispatch xmlns="http://exist.sourceforge.net/NS/exist">
-        <forward url="{$exist:controller}/tests/test.xq"/>
+        <forward url="{$exist:controller}{replace($exist:path, '.json', '.xql', 'q')}"/>
         <error-handler>
           <forward url="{$exist:controller}/tests/error-page.html" method="get"/>
           <forward url="{$exist:controller}/catch-all-handler.xql">

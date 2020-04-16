@@ -211,7 +211,8 @@ declare function local:debug-out($api-problem-1 as item(), $output, $parsed, $se
  :)
 if (((exists(request:get-attribute('org.exist.forward.error')) and
       exists(request:get-attribute('api-problem.set-status-code.workaround'))) or
-     (empty(request:get-attribute('org.exist.forward.error')) and empty(request:get-attribute('javax.servlet.error.message')))) and
+     (empty(request:get-attribute('org.exist.forward.error')) and empty(request:get-attribute('javax.servlet.error.message'))) or
+     (request:get-attribute('javax.servlet.error.status_code') = (404))) and
     not(exists(request:get-attribute('api-problem.set-status-code.workaround.respond')))) then
     let $respond-in-next-invocation := request:set-attribute('api-problem.set-status-code.workaround.respond', 'true')
     return (
@@ -220,17 +221,18 @@ if (((exists(request:get-attribute('org.exist.forward.error')) and
     )
 else
     try {(
-(:        console:log("respond creating final rendering"), :)
+(:        console:log("respond creating final rendering"),:)
+(:        console:log(string-join(for $n in request:attribute-names() return $n||': '||request:get-attribute($n), '&#x0a;')),:)
         local:respond(request:get-header('Accept'))
     )}
     catch java:org.exist.xquery.XPathException | err:FODC0006 { (::)
         try {(
-            console:log("respond can't process in respond org.exist.forward.error "||'&#x0a;'
-            ||$err:code||' at '||$err:module||':'||$err:line-number||':'||$err:column-number||'&#x0a;'
+(:            console:log("respond can't process in respond org.exist.forward.error "||'&#x0a;':)
+(:            ||$err:code||' at '||$err:module||':'||$err:line-number||':'||$err:column-number||'&#x0a;':)
 (:            ||string-join($exerr:xquery-stack-trace, '&#x0a;'):)
-            ||string-join($exerr:java-stack-trace, '&#x0a;')
+(:            ||string-join($exerr:java-stack-trace, '&#x0a;'):)
 (:            ||request:get-attribute('org.exist.forward.error'):)
-            ), 
+(:            ), :)
             parse-xml-fragment(request:get-attribute('org.exist.forward.error'))
         )} catch err:FODC0006 {(
 (:            console:log("org.exist.forward.error is no xml"), :)
