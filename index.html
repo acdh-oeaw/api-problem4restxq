@@ -9,49 +9,109 @@
     <body>
         <div class="container">
         <h1>An API Problem implementation</h1>
-        <p>The following test paths are avaliable
+        <p>The following test paths are avaliable</p>
             <ul>
-              <li>
+              <li id="test1">
                     <a href="tests/test1">test1</a> A somewhat rare error from the standard (402) raised in RestXQ
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
                 </li>
-              <li>
+              <li id="test2">
                     <a href="tests/test2">test2</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
                 </li>
-              <li>
+              <li id="test3">
                     <a href="tests/test3">test3</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
                 </li>
-              <li>
+              <li id="test4">
                     <a href="tests/test4">test4</a> | <a href="tests/test2.html">using templates</a> | <a href="tests-with-catch/test2.html">using templates error processed in view.xql</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
                 </li>
-              <li>
+              <li id="test5">
                     <a href="tests/test5">test5</a> (needs catch-all-handler as error-page)
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
                 </li>
-              <li>
+              <li id="test6">
                     <a href="tests/test6">test6</a> | <a href="tests/test.html">using templates</a> | <a href="tests-with-catch/test.html">using templates error processed in view.xql</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
                 </li>
-              <li>
+              <li id="test7">
                     <a href="tests/test7">test7</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
                 </li>
-              <li>
+              <li id="test8">
                     <a href="tests/test8">test8</a> | <a href="tests-with-catch/test3.html">using templates error processed in view.xql</a>
+                    <div class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </div>
                 </li>
-               <li>
+              <li id="test9">
+                    <a href="tests/test9">test9</a> redirect test -&gt; test2
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </li>
+               <li id="generic-error-in-restxq">
                   <a href="tests/generic-error-in-restxq">Generic error handler triggerd by RestXQ</a> (needs catch-all-handler as error-page)
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
                 </li>
-               <li>
+               <li id="testxq">
                   <a href="tests/test.xq">Call to a script that errors out</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
                 </li>
             </ul>
             <p>
-              404 <a href="doesntexist.html">error response as fall through in controller.xql</a>
-                    <br/>
-              401 <a href="tests/access-denied.html">in a vanilla view.xql</a> | <a href="tests-with-catch/access-denied.html">in a view.xql that catches and processes other errors</a> (if you don't provide username and password) 
+                <span id="doesntexist">404 <a href="doesntexist.html">error response as fall through in controller.xql</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </span>
+                <br/>
+            <span id="access-denied">401 <a href="tests/access-denied.html">in a vanilla view.xql</a> | <a href="tests-with-catch/access-denied.html">in a view.xql that catches and processes other errors</a> (if you don't provide username and password)
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </span>
             </p>
-        </p>
+            <h4>HTTP client output <span id="status-code"/>
+            </h4>
+            <pre id="output">Click a button. The result will be shown here.</pre>
         </div>
         <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"/>
 <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"/>
 <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"/>
 <script src="https://cdn.jsdelivr.net/npm/axios@0.19.2/dist/axios.min.js" integrity="sha256-T/f7Sju1ZfNNfBh7skWn0idlCBcI3RwdLSS4/I7NQKQ=" crossorigin="anonymous"/>
+<script src="httpclient.js"/>
     </body>
 </html>

@@ -74,9 +74,9 @@ declare function local:dispatcher() {
       <dispatch xmlns="http://exist.sourceforge.net/NS/exist">
         <redirect url="index.html"/>
       </dispatch>
-    case $exist:path = '/index.html' return
+    case $exist:path = ('/index.html', '/httpclient.js') return
       <dispatch xmlns="http://exist.sourceforge.net/NS/exist">
-        <forward url="{$exist:controller}/index.html"/>
+        <forward url="{$exist:controller}{$exist:path}"/>
       </dispatch>
     (: use api-problem to report file not found for anything else whether it actually exists or not :)
     default return

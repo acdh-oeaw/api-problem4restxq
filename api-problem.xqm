@@ -27,6 +27,11 @@ declare variable $_:ADDITIONAL_DESCRIPTIONS := 'api-problem.descriptions';
 (: A field in $err:value if it is a map(*) that contains the java stack trace
  : of a caught nested error from java-bindings. :)
 declare variable $_:JAVA_STACK_TRACE := 'api-problem.java-stack-trace';
+(: If you want (or are required to) supply additional information as headers add a map(xs:string, xs:string) using this key :)
+declare variable $_:ADDITIONAL_HEADER_ELEMENTS := 'api-problem.additional-header-elements';
+declare variable $_:API_PROBLEM_VALUE_KEYS := (
+    $_:ADDITIONAL_STACK_TRACE, $_:ADDITIONAL_ERROR_CODES, $_:ADDITIONAL_DESCRIPTIONS, $_:JAVA_STACK_TRACE, $_:ADDITIONAL_HEADER_ELEMENTS
+);
 
 declare function _:or_result($start-time as xs:time, $api-function as function(*)*, $parameters as array(*), $accept as xs:string?) as item()+ {
     _:or_result($start-time, $api-function, $parameters, $accept, (), ())
@@ -46,7 +51,8 @@ declare function _:or_result($start-time as xs:time, $api-function as function(*
           _:inject-runtime($start-time, $ret)
           )
     } catch * {
-        _:problem-from-catch-vars($start-time, $err:code, $err:description, $err:value, $err:module, $err:line-number, $err:column-number, $exerr:xquery-stack-trace, $exerr:java-stack-trace, $accept, $header-elements)
+        let $value-if-map := if ($err:value instance of map(*)) then $err:value else map {}
+        return _:problem-from-catch-vars($start-time, $err:code, $err:description, $err:value, $err:module, $err:line-number, $err:column-number, $exerr:xquery-stack-trace, $exerr:java-stack-trace, $accept, map:merge(($value-if-map($_:ADDITIONAL_HEADER_ELEMENTS), $header-elements)))
     }
 };
 
@@ -59,7 +65,7 @@ declare %private function _:problem-from-catch-vars($start-time as xs:time, $cod
             $status-code := if (namespace-uri-from-QName($codes[1]) eq 'https://tools.ietf.org/html/rfc7231#section-6') then
           let $status-code-from-local-name := replace(local-name-from-QName($code), '_', '')
           return if ($status-code-from-local-name castable as xs:integer and 
-                     xs:integer($status-code-from-local-name) > 400 and
+                     xs:integer($status-code-from-local-name) > 300 and
                      xs:integer($status-code-from-local-name) < 511) then xs:integer($status-code-from-local-name) else 400
         else (500, _:write-log('Program error: returning 500'||'&#x0a;'||
                                namespace-uri-from-QName($codes[1])||':'||local-name-from-QName($codes[1])||'&#x0a;'||
@@ -86,10 +92,18 @@ declare %private function _:code_to_instance_uri($code as xs:QName) as xs:string
 
 declare %private function _:format_err_value($value) {
   if ($value instance of map(*))
-    then let $value := map:remove($value, ($_:ADDITIONAL_STACK_TRACE, $_:ADDITIONAL_ERROR_CODES, $_:ADDITIONAL_DESCRIPTIONS, $_:JAVA_STACK_TRACE))
+    then let $value := _:map_remove($value, $_:API_PROBLEM_VALUE_KEYS)
     return try { if (count(map:keys($value)) > 1 or ($value?* instance of map(*))) then serialize($value, map {'method': 'json'}) else $value?*}
-    catch exerr:SENR0001 { serialize(map:merge(map:for-each(map:remove($value, $_:ADDITIONAL_STACK_TRACE), _:replace_functions#2)), map {'method': 'json'}) }
+    catch exerr:SENR0001 { serialize(map:merge(map:for-each($value, _:replace_functions#2)), map {'method': 'json'}) }
   else $value
+};
+
+(: workaround before 5.3: map:remove ignores second to n of sequence.
+ : workaround in 4.3.1+: map:remove does not accept a sequence.
+ :)
+declare %private function _:map_remove($map as map(*), $keys-to-remove as xs:anyAtomicType*) {
+    if (empty($keys-to-remove)) then $map
+    else _:map_remove(map:remove($map, $keys-to-remove[1]), subsequence($keys-to-remove, 2))
 };
 
 declare %private function _:replace_functions($key as xs:anyAtomicType, $value as item()*) {
@@ -220,8 +234,9 @@ declare
 function _:error-handler($code, $description as xs:string?, $value, $module as xs:string?, $line-number as xs:integer?, $column-number as xs:integer?, $stack-trace as xs:string*, $java-stack-trace as xs:string*, $accept, $origin) {
     let $start-time := util:system-time(),
         $origin := $origin,
-        $header-elements := if (exists($origin)) then map{"Access-Control-Allow-Origin": $origin,
-                                "Access-Control-Allow-Credentials": "true"} else ()
+        $value-if-map := if ($value instance of map(*)) then $value else map {},
+        $header-elements := map:merge(($value-if-map($_:ADDITIONAL_HEADER_ELEMENTS), if (exists($origin)) then map{"Access-Control-Allow-Origin": $origin,
+                                "Access-Control-Allow-Credentials": "true"} else ()))
     return if ($value instance of element()+ and $value[2] instance of element(rfc7807:problem)) 
     then _:return_problem($start-time, $value[2], $accept, $header-elements)
     else try {

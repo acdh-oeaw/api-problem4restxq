@@ -48,7 +48,9 @@ declare function local:respond($accept as xs:string) {
            then 
               let $forwarded-xml := parse-xml-fragment(
                   replace(request:get-attribute('org.exist.forward.error'), '^<\?xml\sversion="1.0"\s?\?>', '', 'm') =>
-                  replace('<!DOCTYPE html>', '', 'm'))/*
+                  replace('<!DOCTYPE html>', '', 'm'))
+                  (: workaround before 5.3: parse-xml-fragment does not return document-node (standard) :)
+                , $forwarded-xml := if ($forwarded-xml instance of document-node()) then $forwarded-xml/* else $forwarded-xml
               return switch(true())
                 case $forwarded-xml instance of element(exception) return local:parse-exception-forward($forwarded-xml)
                 case $forwarded-xml instance of element()+ and $forwarded-xml[2]/local-name() = 'problem' return local:forwarded-problem($forwarded-xml) 

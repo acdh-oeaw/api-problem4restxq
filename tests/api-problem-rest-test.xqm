@@ -3,6 +3,7 @@ xquery version "3.1";
 module namespace _ = "https://tools.ietf.org/html/rfc7807/tests";
 import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem.xqm";
 import module namespace test-call-stack = "https://tools.ietf.org/html/rfc7807/test-call-stack" at "test-call-stack.xqm";
+import module namespace test-errors = "https://tools.ietf.org/html/rfc7807/test-errors" at "test-errors.xqm";
 import module namespace rest = "http://exquery.org/ns/restxq";
 import module namespace req = "http://exquery.org/ns/request";
 
@@ -130,7 +131,7 @@ declare
   %rest:GET
   %rest:header-param('Accept', '{$accept}')
   %rest:path('tests/test8')
-function _:test7($accept as xs:string*) {
+function _:test8($accept as xs:string*) {
   api-problem:or_result(util:system-time(), _:_test8#0, [], string-join($accept, ','))
 };
 
@@ -140,4 +141,16 @@ declare %private function _:_test8() {
 
 declare function _:template-test8($node as node(), $model as map(*)) {
     test-call-stack:catch-and-error()
+};
+
+declare
+  %rest:GET
+  %rest:header-param('Accept', '{$accept}')
+  %rest:path('tests/test9')
+function _:test9($accept as xs:string*) {
+  api-problem:or_result(util:system-time(), _:_test9#0, [], string-join($accept, ','))
+};
+
+declare %private function _:_test9() {
+    test-errors:redirect_error("test2")
 };
