@@ -218,18 +218,8 @@ declare
  : function _:example($accept as xs:string*) {
  :   api-problem:or_result(util:system-time(), _:actual#0, [], string-join($accept, ','))
  : };
- : If you want to use this in a view.xql and get additional information in detail use this:
- :  try {
- :      templates:apply($content, $lookup, () $config)
- :  } catch * {
- :      let $api-problem := api-problem:error-handler(
- :            $err:code, $err:description, $err:value, 
- :            $err:module, $err:line-number, $err:column-number,
- :            api-problem:fix-stack($exerr:xquery-stack-trace, $err:module, $err:line-number, $err:column-number),
- :            'application/xhtml+xml', ''),
- :          $content := doc($config:app-root||'/templates/error-page.html')
- :      return templates:apply($content, $lookup, map {$api-problem:DATA: $api-problem[2]}, $config)
- :  }
+ : If you want to use this in a view.xql and get additional information in detail see the
+ : examples provided in view-with-catch.xql
  :)
 function _:error-handler($code, $description as xs:string?, $value, $module as xs:string?, $line-number as xs:integer?, $column-number as xs:integer?, $stack-trace as xs:string*, $java-stack-trace as xs:string*, $accept, $origin) {
     let $start-time := util:system-time(),
