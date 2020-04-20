@@ -33,10 +33,25 @@ let $config := map {
 let $lookup := (
     if (exists(request:get-attribute('templates.lookup-module')))
     then try {
-        inspect:module-functions(xs:anyURI(request:get-attribute('templates.lookup-module')))
-    } catch * { () }
-    else (),
-    inspect:module-functions(xs:anyURI('/db/apps/api-problem/tests/templates-lookup.xqm'))
+        let $module-uri := xs:anyURI(request:get-attribute('templates.lookup-module')),
+            $ret := inspect:module-functions($module-uri)
+        return if (exists($ret)) then $ret
+        else inspect:inspect-module($module-uri) (: should raise good error :)
+    } catch * {
+        (: Module loading for lookup of template functions failed for some reason.
+         : Provide a lookup function that will fail pretty much the same way as the moudle loading
+         : and log the problem to console
+         :)
+        function ($function-name, $arity) {
+            let $module-uri := xs:anyURI(request:get-attribute('templates.lookup-module'))
+            return inspect:inspect-module($module-uri)
+        },
+        console:log(namespace-uri-from-QName($err:code)||':'||local-name-from-QName($err:code)||'&#x0a;'||
+                            $err:description||'&#x0a;'
+                            ||string-join($exerr:xquery-stack-trace, ' -> ')
+                            ||string-join($exerr:java-stack-trace, ' -> ')) }
+    else console:log('Using default templates lookup fallback!')
+    , inspect:module-functions(xs:anyURI('/db/apps/api-problem/tests/templates-lookup.xqm'))
     )[1]
 
 return
