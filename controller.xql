@@ -47,7 +47,7 @@ declare function local:dispatcher() {
             </forward>
         </error-handler>
       </dispatch>
-    case $exist:path = ('/tests/test.xq', '/openapi.json') return
+    case $exist:path = ('/tests/test.xq', '/openapi.json', '/tests/doesntexist.xq') return
       <dispatch xmlns="http://exist.sourceforge.net/NS/exist">
         <forward url="{$exist:controller}{replace($exist:path, '.json', '.xql', 'q')}"/>
         <error-handler>
@@ -72,7 +72,7 @@ declare function local:dispatcher() {
       <dispatch xmlns="http://exist.sourceforge.net/NS/exist">
         <redirect url="index.html"/>
       </dispatch>
-    case $exist:path = ('/index.html', '/httpclient.js') return
+    case $exist:path = ('/index.html', '/httpclient.js', '/doesntexist2.html') return
       <dispatch xmlns="http://exist.sourceforge.net/NS/exist">
         <forward url="{$exist:controller}{$exist:path}"/>
       </dispatch>

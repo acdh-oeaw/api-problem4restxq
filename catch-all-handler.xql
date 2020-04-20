@@ -74,7 +74,7 @@ declare function local:respond($accept as xs:string) {
           else api-problem:render-output-according-to-accept($accept, $template, $api-problem-restxq, local:render-template#2))
 (:      , $log := (console:log($output), console:log($accept||': '||api-problem:get-stream-serialization-options($output, $api-problem-restxq))):)
     return response:stream($output,  api-problem:get-stream-serialization-options($output, $api-problem-restxq))
-(:      return local:debug-out($api-problem[1], $output, $parsed, api-problem:get-stream-serialization-options($output, $api-problem-restxq)||'&#x0a;'||string-join(for $header in $api-problem[1]/hc:response/hc:header return $header/@name||'='||$header/@value, '&#x0a;')):)
+(:      return local:debug-out($api-problem-restxq[1], $output, $parsed, api-problem:get-stream-serialization-options($output, $api-problem-restxq)||'&#x0a;'||string-join(for $header in $api-problem-restxq[1]/hc:response/hc:header return $header/@name||'='||$header/@value, '&#x0a;')):)
 };
 
 declare function local:parse-javax-message($message as xs:string?) as map(*) {
@@ -210,10 +210,12 @@ declare function local:debug-out($api-problem-1 as item(), $output, $parsed, $se
  : and then the actual rendering with correct headers is done in a second invocation.
  :)
 if (((exists(request:get-attribute('org.exist.forward.error')) and
-      exists(request:get-attribute('api-problem.set-status-code.workaround'))) or
-     (empty(request:get-attribute('org.exist.forward.error')) and empty(request:get-attribute('javax.servlet.error.message'))) or
-     (request:get-attribute('javax.servlet.error.status_code') instance of xs:integer and
-      request:get-attribute('javax.servlet.error.status_code') = (404))) and
+      exists(request:get-attribute('api-problem.set-status-code.workaround')))
+     or (empty(request:get-attribute('org.exist.forward.error')) and empty(request:get-attribute('javax.servlet.error.message')))
+     or (request:get-attribute('javax.servlet.error.status_code') instance of xs:integer and
+      request:get-attribute('javax.servlet.error.status_code') = (404) and
+      exists(request:get-attribute('api-problem.set-status-code.workaround')))
+     ) and
     not(exists(request:get-attribute('api-problem.set-status-code.workaround.respond')))) then
     let $respond-in-next-invocation := request:set-attribute('api-problem.set-status-code.workaround.respond', 'true')
     return (
