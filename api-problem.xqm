@@ -90,12 +90,14 @@ declare %private function _:code_to_instance_uri($code as xs:QName) as xs:string
         else xs:string($code)
 };
 
-declare %private function _:format_err_value($value) {
+declare %private function _:format_err_value($value) as xs:string {
+  let $plain-string :=
   if ($value instance of map(*))
     then let $value := _:map_remove($value, $_:API_PROBLEM_VALUE_KEYS)
     return try { if (count(map:keys($value)) > 1 or ($value?* instance of map(*))) then serialize($value, map {'method': 'json'}) else $value?*}
     catch exerr:SENR0001 { serialize(map:merge(map:for-each($value, _:replace_functions#2)), map {'method': 'json'}) }
   else $value
+  return $plain-string => replace('&amp;', '&amp;amp;') => replace('>', '&amp;gt;') => replace('<', '&amp;lt;')
 };
 
 (: workaround before 5.3: map:remove ignores second to n of sequence.
