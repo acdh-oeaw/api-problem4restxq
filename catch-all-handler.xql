@@ -59,7 +59,8 @@ return
 };
 
 declare function local:respond($accept as xs:string) {
-    let $parsed := if (exists(request:get-attribute('org.exist.forward.error'))) 
+    let $parsed := if (exists(request:get-attribute('org.exist.forward.error'))
+                       and request:get-attribute('org.exist.forward.error') ne "") 
            then 
               let $forwarded-xml := parse-xml-fragment(
                   replace(request:get-attribute('org.exist.forward.error'), '^<\?xml\sversion="1.0"\s?\?>', '', 'm') =>
@@ -85,10 +86,17 @@ declare function local:respond($accept as xs:string) {
         )[1],
         $api-problem-restxq := api-problem:error-handler($parsed('code'), $parsed('description'), $parsed('value'), $parsed('module'), $parsed('line-number'), $parsed('column-number'), $parsed('additional'), (), $accept, request:get-header("Origin")),
         $output := (api-problem:set-status-and-headers-like-restxq($api-problem-restxq[1]),
-          if ($accept = 'application/restxq+xml') then $api-problem-restxq
-          else api-problem:render-output-according-to-accept($accept, $template, $api-problem-restxq, local:render-template#2))
+          if ($accept = 'application/restxq+xml') then (
+              request:set-attribute('api-problem.set-status-code.workaround.respond', $api-problem-restxq),
+              $api-problem-restxq
+          )
+          else
+            let $ret := api-problem:render-output-according-to-accept($accept, $template, $api-problem-restxq, local:render-template#2),
+                $rendered := request:set-attribute('api-problem.set-status-code.workaround.rendered', $ret)
+            return $ret
+            )
 (:      , $log := (console:log($output), console:log($accept||': '||api-problem:get-stream-serialization-options($output, $api-problem-restxq))):)
-    return response:stream($output,  api-problem:get-stream-serialization-options($output, $api-problem-restxq))
+    return response:stream($output, api-problem:get-stream-serialization-options($output, $api-problem-restxq))
 (:      return local:debug-out($api-problem-restxq[1], $output, $parsed, api-problem:get-stream-serialization-options($output, $api-problem-restxq)||'&#x0a;'||string-join(for $header in $api-problem-restxq[1]/hc:response/hc:header return $header/@name||'='||$header/@value, '&#x0a;')):)
 };
 
@@ -223,8 +231,12 @@ declare function local:debug-out($api-problem-1 as item(), $output, $parsed, $se
  : 401 responses from exist-db due to insufficient access rights set in the database don't forward any message
  : whatsoever. So guessing this situation this is also processed here into a respective rfc7807:problem
  : and then the actual rendering with correct headers is done in a second invocation.
+ : There is a corner case where this can be called three times (404 on some file not found for controller.xql)
  :)
-if (((exists(request:get-attribute('org.exist.forward.error')) and
+(:console:log(request:get-attribute('org.exist.forward.error')),:)
+if (exists(request:get-attribute('api-problem.set-status-code.workaround.rendered'))) then
+    request:get-attribute('api-problem.set-status-code.workaround.rendered')
+else if (((exists(request:get-attribute('org.exist.forward.error')) and
       exists(request:get-attribute('api-problem.set-status-code.workaround')))
      or (empty(request:get-attribute('org.exist.forward.error')) and empty(request:get-attribute('javax.servlet.error.message')))
      or (request:get-attribute('javax.servlet.error.status_code') instance of xs:integer and
@@ -232,9 +244,8 @@ if (((exists(request:get-attribute('org.exist.forward.error')) and
       exists(request:get-attribute('api-problem.set-status-code.workaround')))
      ) and
     not(exists(request:get-attribute('api-problem.set-status-code.workaround.respond')))) then
-    let $respond-in-next-invocation := request:set-attribute('api-problem.set-status-code.workaround.respond', 'true')
-    return (
-(:        console:log("respond creating rfc7807"), :)
+    (
+(:        console:log("respond creating rfc7807"),:)
         local:respond('application/restxq+xml')
     )
 else

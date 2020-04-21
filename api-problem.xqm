@@ -417,8 +417,11 @@ declare function _:detail($node as node(), $model as map(*)) {
 };
 
 declare function _:detail-to-ul($node as node(), $model as map(*)) {
-  try { _:map-to-ul(parse-json($model($_:DATA)/rfc7807:detail/text())) }
-  catch err:FOJS0001 { $model($_:DATA)/rfc7807:title/text() }
+  try {
+    if (exists($model($_:DATA)/rfc7807:detail/text()))
+    then _:map-to-ul(parse-json($model($_:DATA)/rfc7807:detail/text()))
+    else ()  
+  } catch err:FOJS0001 { $model($_:DATA)/rfc7807:title/text() }
 };
 
 declare %private function _:map-to-ul($map as map(*)) {
