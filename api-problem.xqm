@@ -46,8 +46,9 @@ declare function _:or_result($start-time as xs:time, $api-function as function(*
         let $ok-status := if ($ok-status > 200 and $ok-status < 300) then $ok-status else 200,
             $ret := apply($api-function, $parameters)
         return if ($ret instance of element(rfc7807:problem)) then _:return_problem($start-time, $ret, $accept, $header-elements)
+        else if ($ret[1] instance of element(rest:response)) then $ret
         else        
-          (_:response-header(_:get_serialization_method($ret), $header-elements, map{'message': $_:codes_to_message($ok-status), 'status': $ok-status}),
+          (_:response-header(_:get_serialization_method($ret[1]), $header-elements, map{'message': $_:codes_to_message($ok-status), 'status': $ok-status}),
           _:inject-runtime($start-time, $ret)
           )
     } catch * {
