@@ -78,7 +78,7 @@ declare %private function _:problem-from-catch-vars($start-time as xs:time, $cod
                     <detail>{_:format_err_value($value)}</detail>
                     <instance>{_:code_to_instance_uri($codes[1])}</instance>
                     <status>{$status-code}</status>
-                    {if ($_:enable_trace) then <trace>&#x0a;{$fixed-stack}{$java-stack-trace}</trace> else ()}
+                    {if ($_:enable_trace) then <trace>&#x0a;{$fixed-stack}{_:xmlencode($java-stack-trace)}</trace> else ()}
                 </problem>, $accept, $header-elements)   
 };
 
@@ -98,7 +98,11 @@ declare %private function _:format_err_value($value) as xs:string {
     return try { if (count(map:keys($value)) > 1 or ($value?* instance of map(*))) then serialize($value, map {'method': 'json'}) else $value?*}
     catch exerr:SENR0001 { serialize(map:merge(map:for-each($value, _:replace_functions#2)), map {'method': 'json'}) }
   else $value
-  return $plain-string => replace('&amp;', '&amp;amp;') => replace('>', '&amp;gt;') => replace('<', '&amp;lt;')
+  return _:xmlencode($plain-string)
+};
+
+declare %private function _:xmlencode($plain-string as xs:string) as xs:string {
+  $plain-string => replace('&amp;', '&amp;amp;') => replace('>', '&amp;gt;') => replace('<', '&amp;lt;')  
 };
 
 (: workaround before 5.3: map:remove ignores second to n of sequence.
