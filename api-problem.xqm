@@ -101,8 +101,10 @@ declare %private function _:format_err_value($value) as xs:string {
   return _:xmlencode($plain-string)
 };
 
-declare %private function _:xmlencode($plain-string as xs:string) as xs:string {
-  $plain-string => replace('&amp;', '&amp;amp;') => replace('>', '&amp;gt;') => replace('<', '&amp;lt;')  
+declare %private function _:xmlencode($plain-string as xs:string?) as xs:string {
+  if (exists($plain-string) and $plain-string != '')
+  then $plain-string => replace('&amp;', '&amp;amp;') => replace('>', '&amp;gt;') => replace('<', '&amp;lt;')
+  else ''
 };
 
 (: workaround before 5.3: map:remove ignores second to n of sequence.
