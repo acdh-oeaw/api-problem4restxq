@@ -151,7 +151,7 @@ let $accept-header := try { req:header("ACCEPT") } catch exerr:* { if (exists($a
     $header-elements := map:merge(($header-elements, map{'Content-Type': if (matches($accept-header, '[+/]json')) then 'application/problem+json' else if (matches($accept-header, 'application/xhtml\+xml')) then 'application/xml' else 'application/problem+xml'})),
 (:    $log := console:log($header-elements),:)
     $error-status := if ($problem/rfc7807:status castable as xs:integer) then xs:integer($problem/rfc7807:status) else 400
-return (_:response-header((), $header-elements, map{'message': $problem/rfc7807:title, 'status': $error-status}),
+return (_:response-header((), $header-elements, map{'message': substring($problem/rfc7807:title, 1, 128), 'status': $error-status}),
  _:inject-runtime($start-time, _:on_accept_to_json($problem, $accept))
 )   
 };
@@ -358,6 +358,14 @@ return <rest:response xmlns:rest="http://exquery.org/ns/restxq">
   <http:response xmlns:http="http://expath.org/ns/http-client">
     {if (exists($atts)) then for $k in map:keys($atts) return attribute {$k} {$atts($k)} else ()}
     {if (exists($headers)) then for $k in map:keys($headers) return <http:header name="{$k}" value="{$headers($k)}"/> else ()}
+    {if (exists($headers) and exists($headers?Content-Type)) then () else
+        if (exists($output)) then switch ($output('method'))
+          case 'xml' return <http:header name="Content-Type" value="application/xml"/>
+          case 'xhtml' return <http:header name="Content-Type" value="application/xhtml+xml"/>
+          case 'text' return <http:header name="Content-Type" value="text/plain"/>
+          default return ()
+        else ()
+    }
   </http:response>
   <output:serialization-parameters xmlns:output="http://www.w3.org/2010/xslt-xquery-serialization">
     {if (exists($output)) then for $k in map:keys($output) return element {xs:QName('output:'||$k)} {namespace {'output'} {'http://www.w3.org/2010/xslt-xquery-serialization'}, attribute {'value'} {$output($k)} } else ()} 
