@@ -4,7 +4,7 @@
   "description": "JS tests for api-problem xqm for BaseX",
   "main": "node_modules/.bin/_mocha",
   "scripts": {
-    "test": "node_modules/.bin/_mocha"
+    "test": "node_modules/.bin/_mocha tests/*spec.js"
   },
   "author": "Omar Siam",
   "license": "MIT",

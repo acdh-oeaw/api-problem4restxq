@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <title>An API Problem implementation</title>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous"/>
+        <script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8/dist/polyfill.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/url-search-params-polyfill@8.0.0/index.min.js"></script>
+    </head>
+    <body>
+        <div class="container">
+        <h1>An API Problem implementation</h1>
+        <p>The following test paths are avaliable</p>
+            <ul>
+              <li id="test1">
+                    <a href="test1">test1</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </li>
+              <li id="test2">
+                    <a href="test2">test2</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </li>
+              <li id="test3">
+                    <a href="test3">test3</a> A somewhat rare error from the standard (402) raised in RestXQ
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </li>
+              <li id="test4">
+                    <a href="test4">test4</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </li>
+              <li id="test5">
+                    <a href="test5">test5</a> (uses catch-all-errors-handler)
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </li>
+              <li id="test6">
+                    <a href="test6">test6</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </li>
+              <li id="test7">
+                    <a href="test7">test7</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </li>
+              <li id="test8">
+                    <a href="test8">test8</a>
+                    <div class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </div>
+                </li>
+              <li id="test9">
+                    <a href="test9">test9</a> redirect test -&gt; test2
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </li>
+            </ul>
+            <p>
+                <span id="doesntexist">404 <a href="doesntexist.html">error response because of api-problem-rest-test.xqm not finding a file.</a>
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </span> |<br/>
+            <!-- <span id="access-denied">401 <a href="access-denied.html">response from api-problem-rest-test.xqm</a> (if you don't provide username and password)
+                    <span class="btn-group" role="group" aria-label="Get XML or JSON">
+                        <button type="button" class="btn btn-primary btn-sm xml">XML</button>
+                        <button type="button" class="btn btn-primary btn-sm json">JSON</button>
+                    </span>
+                </span> -->
+            </p>
+            <h4>HTTP client output <span id="status-code"/>
+            </h4>
+            <pre id="output">Click a button. The result will be shown here.</pre>
+        </div>
+        <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios@0.19.2/dist/axios.min.js" integrity="sha256-T/f7Sju1ZfNNfBh7skWn0idlCBcI3RwdLSS4/I7NQKQ=" crossorigin="anonymous"></script>
+<script src="httpclient.js"></script>
+    </body>
+</html>
