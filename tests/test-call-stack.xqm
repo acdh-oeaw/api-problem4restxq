@@ -2,7 +2,7 @@ xquery version "3.1";
 
 module namespace _ = "https://tools.ietf.org/html/rfc7807/test-call-stack";
 import module namespace m = "https://tools.ietf.org/html/rfc7807/test-errors" at "test-errors.xqm";
-import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem.xqm";
+import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem/api-problem.xqm";
 
 (: All functions here would be inlined away of course but we want to demonstrate a stack trace. :)
 

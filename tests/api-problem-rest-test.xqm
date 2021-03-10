@@ -1,7 +1,7 @@
 xquery version "3.0";
 
 module namespace _ = "https://tools.ietf.org/html/rfc7807/tests";
-import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem.xqm";
+import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem/api-problem.xqm";
 import module namespace test-call-stack = "https://tools.ietf.org/html/rfc7807/test-call-stack" at "test-call-stack.xqm";
 import module namespace test-errors = "https://tools.ietf.org/html/rfc7807/test-errors" at "test-errors.xqm";
 import module namespace rest = "http://exquery.org/ns/restxq";
@@ -10,7 +10,7 @@ import module namespace req = "http://exquery.org/ns/request";
 declare namespace response-codes = "https://tools.ietf.org/html/rfc7231#section-6";
 
 declare
-  %rest:path('tests/test1')
+  %rest:path('api-problem-tests/test1')
   %rest:GET
 function _:test1() {
   api-problem:or_result(prof:current-ns(), _:error-out#3, [' Test1', ' Test2', ' Test3'])
@@ -33,7 +33,7 @@ declare %private function _:error-out($param1, $param2, $param3) {
 };
 
 declare
-  %rest:path('tests/test2')
+  %rest:path('api-problem-tests/test2')
   %rest:GET
 function _:test2() {
    api-problem:or_result(prof:current-ns(), _:create-test-data#3, [' Test1', ' Test2', ' Test3'])
@@ -59,7 +59,7 @@ declare %private function _:create-test-data($param1, $param2, $param3) {
 };
 
 declare
-  %rest:path('tests/test3')
+  %rest:path('api-problem-tests/test3')
   %rest:GET
 function _:test3() {
   api-problem:or_result(prof:current-ns(), _:custom-api-problem#0, [])
@@ -81,7 +81,7 @@ declare %private function _:custom-api-problem() {
 };
 
 declare
-  %rest:path('tests/test4')
+  %rest:path('api-problem-tests/test4')
   %rest:GET
 function _:test4() {
   api-problem:or_result(prof:current-ns(), _:standard-http-error#0, [])
@@ -92,14 +92,14 @@ declare %private function _:standard-http-error() {
 };
 
 declare
-  %rest:path('tests/test5')
+  %rest:path('api-problem-tests/test5')
   %rest:GET
 function _:test5() {
     error(xs:QName('response-codes:_403'), 'Test access denied!', 'This is not wrapped!')
 };
 
 declare
-  %rest:path('tests/test6')
+  %rest:path('api-problem-tests/test6')
   %rest:GET
 function _:test6() {
     test-call-stack:stack-int_l1()
@@ -107,7 +107,7 @@ function _:test6() {
 
 declare
   %rest:GET
-  %rest:path('tests/test7')
+  %rest:path('api-problem-tests/test7')
 function _:test7() {
   api-problem:or_result(prof:current-ns(), _:_test7#0, [])
 };
@@ -118,7 +118,7 @@ declare %private function _:_test7() {
 
 declare
   %rest:GET
-  %rest:path('tests/test8')
+  %rest:path('api-problem-tests/test8')
 function _:test8() {
   api-problem:or_result(prof:current-ns(), _:_test8#0, [])
 };
@@ -129,7 +129,7 @@ declare %private function _:_test8() {
 
 declare
   %rest:GET
-  %rest:path('tests/test9')
+  %rest:path('api-problem-tests/test9')
 function _:test9() {
   api-problem:or_result(prof:current-ns(), _:_test9#0, [])
 };
@@ -161,7 +161,7 @@ declare function _:get-base-uri-public() as xs:string {
  : @return rest response and binary file
  :)
 declare
-  %rest:path("tests/{$file=[^/]+}")
+  %rest:path("api-problem-tests/{$file=[^/]+}")
 function _:file($file as xs:string) as item()+ {
   let $path := _:base-dir()||$file
   return if (file:exists($path)) then
@@ -202,7 +202,7 @@ declare %private function _:base-dir() as xs:string {
  : @return rest response and binary file
  :)
 declare
-  %rest:path("tests")
+  %rest:path("api-problem-tests")
 function _:index-file() as item()+ {
   let $index-html := _:base-dir()||'index.html',
       $uri := rest:uri(),
@@ -242,7 +242,7 @@ function _:forbidden-file($file as xs:string) as item()+ {
 };
 
 declare
-  %rest:path("tests/runtime")
+  %rest:path("api-problem-tests/runtime")
 function _:runtime-info() as item()+ {
   let $runtime-info := db:system(),
       $xslt-runtime-info := xslt:transform(<_/>,

@@ -2,7 +2,7 @@ xquery version "3.1";
 
 module namespace _ = "https://tools.ietf.org/html/rfc7807/test-errors";
 
-import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem.xqm";
+import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem/api-problem.xqm";
 
 declare namespace response-codes = "https://tools.ietf.org/html/rfc7231#section-6";
 
