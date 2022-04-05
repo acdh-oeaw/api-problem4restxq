@@ -6,7 +6,7 @@ import module namespace l = "http://basex.org/modules/admin";
 
 import module namespace rest = "http://exquery.org/ns/restxq";
 
-import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem.xqm";
+import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem/api-problem.xqm";
 
 declare namespace response-codes = "https://tools.ietf.org/html/rfc7231#section-6";
 
@@ -31,7 +31,7 @@ declare function api:get-base-uri-public() as xs:string {
  : @return rest response and binary file
  :)
 declare
-  %rest:path("tests/{$file=[^/]+}")
+  %rest:path("api-problem-tests/{$file=[^/]+}")
 function api:file($file as xs:string) as item()+ {
   let $path := api:base-dir()|| $file
   return if (file:exists($path)) then
@@ -45,7 +45,7 @@ function api:file($file as xs:string) as item()+ {
 };
 
 declare
-  %rest:path("tests/favicons/{$file=.+}")
+  %rest:path("api-problem-tests/favicons/{$file=.+}")
 function api:favicons-file($file as xs:string) as item()+ {
   api:file('favicons/'||$file)
 };
@@ -60,7 +60,7 @@ declare %private function api:base-dir() as xs:string {
  : @return rest response and binary file
  :)
 declare
-  %rest:path("tests")
+  %rest:path("api-problem-tests")
 function api:index-file() as item()+ {
   let $index-html := api:base-dir()||'index.html',
       $index-htm := api:base-dir()||'index.htm',
@@ -92,19 +92,19 @@ function api:forbidden-file($file as xs:string) as item()+ {
 };
 
 declare
-  %rest:path("tests/access-denied.html")
+  %rest:path("api-problem-tests/access-denied.html")
 function api:show-401() as item()+ {
   error(xs:QName('response-codes:_401'), $api-problem:codes_to_message(401), 'Please authenticate')
 };
 
 declare
-  %rest:path("tests/test-error.xqm")
+  %rest:path("api-problem-tests/test-error.xqm")
 function api:test-error() as item()+ {
   api:test-error('api:test-error')
 };
 
 declare
-  %rest:path("tests/test-error.xqm/{$error-qname}")
+  %rest:path("api-problem-tests/test-error.xqm/{$error-qname}")
 function api:test-error($error-qname as xs:string) as item()+ {
   (: error(xs:QName($error-qname)) :)
   api-problem:render-output-according-to-accept(    
@@ -113,7 +113,7 @@ function api:test-error($error-qname as xs:string) as item()+ {
 };
 
 declare
-  %rest:path("tests/runtime")
+  %rest:path("api-problem-tests/runtime")
 function api:runtime-info() as item()+ {
   let $runtime-info := db:system(),
       $xslt-runtime-info := xslt:transform(<_/>,

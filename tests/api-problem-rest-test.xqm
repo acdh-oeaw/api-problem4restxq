@@ -1,7 +1,7 @@
 xquery version "3.0";
 
 module namespace _ = "https://tools.ietf.org/html/rfc7807/tests";
-import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem.xqm";
+import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem/api-problem.xqm";
 import module namespace test-call-stack = "https://tools.ietf.org/html/rfc7807/test-call-stack" at "test-call-stack.xqm";
 import module namespace test-errors = "https://tools.ietf.org/html/rfc7807/test-errors" at "test-errors.xqm";
 import module namespace rest = "http://exquery.org/ns/restxq";
@@ -13,7 +13,7 @@ declare namespace response-codes = "https://tools.ietf.org/html/rfc7231#section-
    As this is a demo for stack traces %basex:inline(0) is used excessivly:)
 
 declare
-  %rest:path('tests/test1')
+  %rest:path('api-problem-tests/test1')
   %rest:GET
   %basex:inline(0)
 function _:test1() {
@@ -39,7 +39,7 @@ declare %basex:inline(0) %private function _:error-out($param1, $param2, $param3
 };
 
 declare
-  %rest:path('tests/test2')
+  %rest:path('api-problem-tests/test2')
   %rest:GET
 function _:test2() {
    api-problem:or_result(prof:current-ns(), _:create-test-data#3, [' Test1', ' Test2', ' Test3'])
@@ -65,7 +65,7 @@ declare %private function _:create-test-data($param1, $param2, $param3) {
 };
 
 declare
-  %rest:path('tests/test3')
+  %rest:path('api-problem-tests/test3')
   %rest:GET
   %basex:inline(0)
 function _:test3() {
@@ -88,7 +88,7 @@ declare %basex:inline(0) %private function _:custom-api-problem() {
 };
 
 declare
-  %rest:path('tests/test4')
+  %rest:path('api-problem-tests/test4')
   %rest:GET
   %basex:inline(0)
 function _:test4() {
@@ -100,7 +100,7 @@ declare %basex:inline(0) %private function _:standard-http-error() {
 };
 
 declare
-  %rest:path('tests/test5')
+  %rest:path('api-problem-tests/test5')
   %rest:GET
   %basex:inline(0)
 function _:test5() {
@@ -108,7 +108,7 @@ function _:test5() {
 };
 
 declare
-  %rest:path('tests/test6')
+  %rest:path('api-problem-tests/test6')
   %rest:GET
   %basex:inline(0)
 function _:test6() {
@@ -117,7 +117,7 @@ function _:test6() {
 
 declare
   %rest:GET
-  %rest:path('tests/test7')
+  %rest:path('api-problem-tests/test7')
   %basex:inline(0)
 function _:test7() {
   api-problem:or_result(prof:current-ns(), _:_test7#0, [])
@@ -129,7 +129,7 @@ declare %basex:inline(0) %private function _:_test7() {
 
 declare
   %rest:GET
-  %rest:path('tests/test8')
+  %rest:path('api-problem-tests/test8')
   %basex:inline(0)
 function _:test8() {
   api-problem:render-output-according-to-accept (
@@ -142,7 +142,7 @@ declare %basex:inline(0) %private function _:_test8() {
 };
 declare
   %rest:GET
-  %rest:path('tests/test9')
+  %rest:path('api-problem-tests/test9')
   %basex:inline(0)
 function _:test9() {
   api-problem:or_result(prof:current-ns(), _:_test9#0, [])

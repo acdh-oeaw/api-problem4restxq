@@ -2,7 +2,7 @@ xquery version "3.1";
 
 module namespace _ = "https://tools.ietf.org/html/rfc7807/test-call-stack";
 import module namespace m = "https://tools.ietf.org/html/rfc7807/test-errors" at "test-errors.xqm";
-import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem.xqm";
+import module namespace api-problem = "https://tools.ietf.org/html/rfc7807" at "../api-problem/api-problem.xqm";
 
 (: all of the functions in this module would be inlined.
    As this is a demo for stack traces %basex:inline(0) is used excessivly:)

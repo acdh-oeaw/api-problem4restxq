@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://expath.org/ns/pkg"
+  name="https://github.com/acdh-oeaw/api-problem"
+  abbrev="api-problem"
+  version="0.6.1"
+  spec="1.0"
+  xml:id="api-problem">
+  <title>An API Problem implementation</title>
+  <dependency processor="basex" semver-min="9.1.0"/>
+  <xquery>
+    <namespace>https://tools.ietf.org/html/rfc7807</namespace>
+    <file>api-problem.xqm</file>
+  </xquery>
+</package>

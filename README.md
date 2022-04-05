@@ -1,17 +1,31 @@
-# Helper module for RESTful APIs
+An API Problem implementation
+=============================
 
-The module `api-problem.xqm` is a helper that allows you to report errors to the REST API
-user by simply using the `error()` function with a special URI.
-This should help keep your code clean.
-The errors are structured as described in [RFC 7807](https://datatracker.ietf.org/doc/html/rfc7807).
-A HTTP Accept header based switch between JSON and XML is implemented.
+This module implements easy to use [RFC 7808](https://tools.ietf.org/html/rfc7807)
+error reporting from RestXQ functions. This can be as easy as raisng a specifically crafted error.
 
-## How to use
+Minimum BaseX version required
+------------------------------
 
-This is not a packaged module. You probably should copy `api-problem.xqm` to your source code.
-Please not that by default this declares a default error handler and you can have only one of them.
+This works with BaseX 9.1.0 and up.
+In 9.0.2 there is a problem with `web:response-header()` which has a workaround
+but it is not included here.
+With replacements for convenience function this probably is usabel in 8.x.y.
 
-## Documentation and tests
+Usage
+-----
 
-There is not much documentation yet. But you can see the JS side as well as
-how to utilize the module in the `tests` directory.
+* Add api-problem.xqm to your code in the `webapp` directory.
+  This installs a catch all error handler that formats errors according to RFC 7808
+  in either XML or JSON representation depending on the accept header.
+* Use this as a module and wrap calls to your RestXQ code in a function
+  `api-problem:or_result()`
+
+Demos and tests
+---------------
+
+Look into the test directory to see possible usage scenarios.
+
+If you download `git clone` this repository into your `webapp` directory
+a demo page in `/api-problem-tests` will be available. There is a small mocha based
+test suite that you can try and run with `yarn install` `yarn run test` (or npm).
