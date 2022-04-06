@@ -12,9 +12,6 @@
             "program": "${workspaceFolder}\\node_modules\\mocha\\bin\\_mocha",
             "args": [
                 "tests/api-preblem-spec.js"
-            ],
-            "runtimeArgs": [
-                "--harmony_regexp_property"
             ]
         }
     ]
