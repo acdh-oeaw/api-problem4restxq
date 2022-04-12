@@ -98,6 +98,13 @@ function api:show-401() as item()+ {
 };
 
 declare
+  %perm:check('api-problem-tests/access-denied.html', '{$perm}')
+function api:perm-401($perm as map(*)) {
+  let $check_authentication := if ((:dummy:)true()) then error(xs:QName('response-codes:_401'), $api-problem:codes_to_message(401), 'Please authenticate (from %perm:check function)')
+  return (:permissions checked out:)()
+};
+
+declare
   %rest:path("api-problem-tests/test-error.xqm")
 function api:test-error() as item()+ {
   api:test-error('api:test-error')
