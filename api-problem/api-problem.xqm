@@ -1,4 +1,4 @@
-xquery version "3.0";
+xquery version "3.1";
 
 module namespace _ = "https://tools.ietf.org/html/rfc7807";
 import module namespace req = "http://exquery.org/ns/request";
@@ -41,7 +41,7 @@ declare function _:or_result($start-time-ns as xs:integer, $api-function as func
             $ret := apply($api-function, $parameters)
         return if ($ret instance of element(rfc7807:problem)) then _:return_problem($start-time-ns, $ret,$header-elements)
         else        
-          (web:response-header(_:get_serialization_method($ret), $header-elements, map{'message': $_:codes_to_message($ok-status), 'status': $ok-status}),
+          (_:workaround_902(web:response-header(_:get_serialization_method($ret), $header-elements, map{'message': $_:codes_to_message($ok-status), 'status': $ok-status})),
           _:inject-runtime($start-time-ns, $ret)
           )
     } catch * {
@@ -137,7 +137,7 @@ let $accept-header := try { req:header("ACCEPT") } catch basex:http { 'applicati
     $header-elements := map:merge(($header-elements, map{'Content-Type': if (matches($accept-header, '[+/]json')) then 'application/problem+json' else if (matches($accept-header, 'application/xhtml\+xml')) then 'application/xml' else 'application/problem+xml'})),
     $output :=  if (matches($accept-header, '[+/]json')) then map{'method': 'json', 'media-type': 'application/problem+json'} else if (matches($accept-header, 'application/xhtml\+xml')) then map{'method': 'xhtml', 'media-type': 'application/xhtml+xml'} else map{'method': 'xml', 'media-type': 'application/problem+xml'},
     $error-status := if ($problem/rfc7807:status castable as xs:integer) then xs:integer($problem/rfc7807:status) else 400
-return (web:response-header($output, $header-elements, map{'message': $problem/rfc7807:title, 'status': $error-status}),
+return (_:workaround_902(web:response-header($output, $header-elements, map{'message': $problem/rfc7807:title, 'status': $error-status})),
  _:inject-runtime($start-time-ns, _:on_accept_to_json($problem))
 )   
 };
@@ -233,7 +233,7 @@ function _:error-handler($code as xs:string, $description, $value, $module, $lin
                     <status>{$status-code}</status>
                     {if ($_:enable_trace) then <trace xml:space="preserve">{replace(replace($additional, '^.*Stopped at ', '', 's'), ':\n.*($|(\n\nStack Trace:(\n)))', '$3')}</trace> else ()}
                 </problem>, if (exists($origin)) then map{"Access-Control-Allow-Origin": $origin,
-                          "Access-Control-Allow-Credentials": "true"} else ())  
+                                "Access-Control-Allow-Credentials": "true"} else ())  
 };
 
 declare %private function _:on_accept_to_json($problem as element(rfc7807:problem)) {
@@ -338,7 +338,7 @@ declare function _:render-output-according-to-accept($template, $api-problem-res
           $template instance of element() and $template/namespace-uri() = 'http://www.w3.org/1999/xhtml' and
           matches($accept, 'application/xhtml\+xml'))
 (:      , $log := console:log($api-problem[1]):)
-    return if ($should-render) then (web:response-header((), map{'Content-Type': 'text/html'}, map{'status': $api-problem-restxq[1]/http:response/@status/data()}), $render-function($template, $api-problem-restxq[2]))
+    return if ($should-render) then (_:workaround_902(web:response-header((), map{'Content-Type': 'text/html'}, map{'status': $api-problem-restxq[1]/http:response/@status/data()})), $render-function($template, $api-problem-restxq[2]))
           else $api-problem-restxq
 };
 
@@ -652,3 +652,12 @@ declare variable $_:html_template := <html xmlns="http://www.w3.org/1999/xhtml">
         <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"/>
     </body>
 </html>;
+
+declare %private function _:workaround_902($in as element(rest:response)) as element(rest:response) {
+  copy $out := $in
+  modify (delete node $out/@message,
+              delete node $out/@status,
+              insert node $in/@message as first into $out/*:response,
+              insert node $in/@status as first into $out/*:response )
+  return parse-xml-fragment(serialize(<_ xmlns:rest="http://exquery.org/ns/restxq" xmlns:http="http://expath.org/ns/http-client" xmlns:output="http://www.w3.org/2010/xslt-xquery-serialization">{$out}</_>, map {'indent': 'no'}))/*/*
+};
