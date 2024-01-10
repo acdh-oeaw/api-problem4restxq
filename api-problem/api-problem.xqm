@@ -598,7 +598,7 @@ declare variable $_:problem_qname_to_uri := map {
 };
 
 declare function _:default-render-api-problem($template as element(), $api-problem as element(rfc7807:problem)) {
-  $template update (
+  $template update {
     for $date-template-att in .//@data-template
     let $node := $date-template-att/..
     return switch($date-template-att/data())
@@ -612,7 +612,7 @@ declare function _:default-render-api-problem($template as element(), $api-probl
     case "api-problem:trace_as_pre" return replace node $node with _:trace_as_pre($node, map{$_:DATA: $api-problem})
     case "api-problem:as_html_pre" return replace node $node with _:as_html_pre($node, map{$_:DATA: $api-problem})    
     default return delete node $node
-  )
+  }
 };
 
 declare variable $_:html_template := <html xmlns="http://www.w3.org/1999/xhtml">
