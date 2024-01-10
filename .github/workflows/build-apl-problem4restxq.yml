@@ -41,7 +41,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ${{ inputs.registry_root }}${{ inputs.image_tagged || inputs.image_name }}
+            ${{ env.DOCKER_TAG }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
