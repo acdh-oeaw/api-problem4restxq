@@ -20,5 +20,8 @@
   "devDependencies": {
     "ofetch": "^1.3.3",
     "vitest": "^1.2.2"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
   }
 }
