@@ -4,7 +4,7 @@
   "description": "JS tests for api-problem xqm for BaseX",
   "main": "node_modules/.bin/_mocha",
   "scripts": {
-    "test": "node_modules/.bin/_mocha tests/*spec.js"
+    "test": "vitest"
   },
   "engines": {
     "node": "20.x",
@@ -13,14 +13,12 @@
   },
   "author": "Omar Siam",
   "license": "MIT",
-  "dependencies": {
-    "chai": "^4.3.6",
-    "chai-as-promised": "^7.1.1",
-    "mocha": "^9.2.2",
-    "supertest": "^6.2.2"
-  },
   "packageManager": "yarn@4.0.2",
   "mocha": {
     "spec": "tests/**/*spec.js"
+  },
+  "devDependencies": {
+    "ofetch": "^1.3.3",
+    "vitest": "^1.2.2"
   }
 }
