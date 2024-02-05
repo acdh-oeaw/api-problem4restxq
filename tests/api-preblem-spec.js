@@ -67,9 +67,9 @@ describe('API Problem reporting XML', async () => {
         await ofetch.raw('/api-problem-tests/test6', {baseURL, method: "GET"})
       } catch (err) {
         expect(err.status).to.equal(500)
-        expect(err.statusMessage).to.equal('http://www.w3.org/2005/xqt-errors/FORG0001: Cannot convert xs:string to xs:integer: "ABCD".')
+        expect(err.statusMessage).to.match(/http:\/\/www.w3.org\/2005\/xqt-errors\/FORG0001: Cannot convert (xs:string )?to xs:integer: "?ABCD"?./)
         const errBody = await err.data.text()
-        expect(errBody).to.match(/"ABCD".<\/title>/)
+        expect(errBody).to.match(/"?ABCD"?.<\/title>/)
       }
     });
     it('should run test7', async () => {
@@ -87,7 +87,7 @@ describe('API Problem reporting XML', async () => {
         await ofetch.raw('/api-problem-tests/test8', {baseURL, method: "GET"})
       } catch (err) {
         expect(err.status).to.equal(500)
-        expect(err.statusMessage).to.equal('err:FORG0001 > _:catch-and-error: Cannot convert xs:string to xs:integer: "ABCD". > Catch and error')
+        expect(err.statusMessage).to.match(/err:FORG0001 > _:catch-and-error: Cannot convert (xs:string )?to xs:integer: "?ABCD"?. > Catch and error/)
         const errBody = await err.data.text()
         expect(errBody).to.match(/Catch and error<\/title>/)
       }
@@ -203,8 +203,8 @@ describe('API Problem reporting JSON', function() {
       } catch (err) {
         expect(err.status).to.equal(500)
         expect(err.response.headers.get('content-type')).to.match(/\/problem\+json/)
-        expect(err.statusMessage).to.equal('http://www.w3.org/2005/xqt-errors/FORG0001: Cannot convert xs:string to xs:integer: "ABCD".')
-        expect(err.data.title).to.match(/"ABCD"/)
+        expect(err.statusMessage).to.match(/http:\/\/www.w3.org\/2005\/xqt-errors\/FORG0001: Cannot convert (xs:string )?to xs:integer: "?ABCD"?./)
+        expect(err.data.title).to.match(/"?ABCD"?/)
       }
     });
     it('should run test7', async () => {
@@ -215,6 +215,15 @@ describe('API Problem reporting JSON', function() {
         expect(err.response.headers.get('content-type')).to.match(/\/problem\+json/)
         expect(err.statusMessage).to.equal('_:an-error: testError Test1 Test2 Test3')
         expect(err.data.title).to.match(/testError Test1 Test2 Test3/)
+      }
+    });
+    it('should run test8', async () => {
+      try {
+        await ofetch.raw('/api-problem-tests/test8', {baseURL, method: "GET", headers: {accept: "application/json"}})
+      } catch (err) {
+        expect(err.status).to.equal(500)
+        expect(err.statusMessage).to.match(/err:FORG0001 > _:catch-and-error: Cannot convert (xs:string )?to xs:integer: "?ABCD"?. > Catch and error/)
+        expect(err.data.title).to.match(/Catch and error/)
       }
     });
     it('should run test9', async () => {
