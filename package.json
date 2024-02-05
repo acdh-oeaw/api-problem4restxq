@@ -4,7 +4,7 @@
   "description": "JS tests for api-problem xqm for BaseX",
   "main": "node_modules/.bin/_mocha",
   "scripts": {
-    "test": "vitest"
+    "test": "vitest --run"
   },
   "engines": {
     "node": "20.x",
