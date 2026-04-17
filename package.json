@@ -7,9 +7,9 @@
     "test": "vitest --run"
   },
   "engines": {
-    "node": "20.x",
+    "node": "24.x",
     "yarn": "1.x",
-    "basex": "10.6"
+    "basex": "12.3"
   },
   "author": "Omar Siam",
   "license": "MIT",
