@@ -11,8 +11,13 @@ const ApiProblem = z.object({
   trace: z.string().optional()
 })
 
+const textFun = z.function({
+  input: [],
+  output: z.promise(z.string())
+})
+
 const Text = z.object({
-  text: z.function().args().returns(z.promise(z.string()))
+  text: textFun
 })
 
 type FetchErrorWithXML = FetchError<z.infer<typeof Text>>
