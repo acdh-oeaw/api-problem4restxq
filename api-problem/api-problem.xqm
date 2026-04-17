@@ -3,6 +3,7 @@ xquery version "3.0";
 module namespace _ = "https://tools.ietf.org/html/rfc7807";
 import module namespace req = "http://exquery.org/ns/request";
 import module namespace admin = "http://basex.org/modules/admin"; (: for logging :)
+import module namespace err = "http://www.w3.org/2005/xqt-errors" at "err-polyfill.xqm";
 
 declare namespace rfc7807 = "urn:ietf:rfc:7807";
 declare namespace response-codes = "https://tools.ietf.org/html/rfc7231#section-6";
@@ -142,7 +143,7 @@ let $accept-header := try { req:header("ACCEPT") } catch basex:http { 'applicati
     $header-elements := map:merge(($header-elements, map{'Content-Type': if (matches($accept-header, '[+/]json')) then 'application/problem+json' else if (matches($accept-header, 'application/xhtml\+xml')) then 'application/xml' else 'application/problem+xml'})),
     $output :=  if (matches($accept-header, '[+/]json')) then map{'method': 'json', 'media-type': 'application/problem+json'} else if (matches($accept-header, 'application/xhtml\+xml')) then map{'method': 'xhtml', 'media-type': 'application/xhtml+xml'} else map{'method': 'xml', 'media-type': 'application/problem+xml'},
     $error-status := if ($problem/rfc7807:status castable as xs:integer) then xs:integer($problem/rfc7807:status) else 400
-return (web:response-header($output, $header-elements, map{'message': $problem/rfc7807:title, 'status': $error-status}),
+return (web:response-header($output, $header-elements, map{'message': $_:codes_to_message($error-status), 'status': $error-status}),
  _:inject-runtime($start-time-ns, _:on_accept_to_json($problem))
 )   
 };
@@ -214,18 +215,19 @@ function _:error-handler($code, $description, $value, $module, $line-number, $co
         let $start-time-ns := prof:current-ns(),
             $additional := string-join($additional, '&#x0a;'),
             $origin := try { req:header("Origin") } catch basex:http {'urn:local'},
+            $code := if ($code instance of xs:string) then xs:QName($code) else $code,
             $type := try {
-              namespace-uri-from-QName(xs:QName($code))
+              namespace-uri-from-QName($code)
             } catch err:FONS0004 {
               replace($code, '^[^:]+:', '')
             },
             $instance := try {
-              namespace-uri-from-QName(xs:QName($code))||"/"||local-name-from-QName(xs:QName($code))
+              namespace-uri-from-QName($code)||"/"||local-name-from-QName($code)
             } catch err:FONS0004 {
               $code
             },
             $status-code := 
-          let $status-code-from-local-name := try {replace(local-name-from-QName(xs:QName($code)), '_', '')}
+          let $status-code-from-local-name := try {replace(local-name-from-QName($code), '_', '')}
           catch err:FONS0004 {$code}
           return if ($status-code-from-local-name castable as xs:integer and 
                      xs:integer($status-code-from-local-name) >= 300 and
@@ -432,7 +434,7 @@ declare variable $_:codes_to_message := map {
 
     300: 'Multiple Choices',
     301: 'Moved Permanently',
-    302: 'Moved Temporarily',
+    302: 'Found',
     303: 'See Other',
     304: 'Not Modified',
     305: 'Use Proxy',
@@ -474,7 +476,7 @@ declare variable $_:codes_to_message := map {
     451: 'Unavailable For Legal Reasons',
     499: 'Client Closed Request',
 
-    500: 'Internal Server Error',
+    500: 'Server Error',
     501: 'Not Implemented',
     502: 'Bad Gateway',
     503: 'Service Unavailable',

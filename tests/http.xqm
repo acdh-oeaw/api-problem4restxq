@@ -146,3 +146,13 @@ function api:runtime-info() as item()+ {
     </body>
   </html>
 };
+
+declare
+  %rest:path("response_message")
+function api:response_message() {
+(web:response-header(
+  {},
+  { 'Cache-Control': 'max-age=3600,public' },
+  { 'status': 200, 'message': 'Something else' }
+), "Something else")
+};

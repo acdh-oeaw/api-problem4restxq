@@ -3,7 +3,7 @@ import { FetchError, ofetch } from "ofetch";
 import { z } from "zod";
 
 const ApiProblem = z.object({
-  type: z.string().url(),
+  type: z.url(),
   title: z.string(),
   detail: z.string(),
   instance: z.string(),
@@ -32,7 +32,7 @@ describe('API Problem reporting XML', () => {
       if (e instanceof FetchError) {
         const err: FetchErrorWithXML = e
         expect(err.status).to.equal(500)
-        expect(err.statusMessage).to.equal('_:an-error: testError Test1 Test2 Test3')
+        expect(err.statusMessage).to.equal('Server Error')
         const errBody = await err.data!.text()
         expect(errBody).to.match(/testError Test1 Test2 Test3<\/title>/)
       }
@@ -60,7 +60,7 @@ describe('API Problem reporting XML', () => {
       if (e instanceof FetchError) {
         const err: FetchErrorWithXML = e
         expect(err.status).to.equal(402)
-        expect(err.statusMessage).to.equal('You do not have enough credit.')
+        expect(err.statusMessage).to.equal('Payment Required')
         const errBody = await err.data!.text()
         expect(errBody).to.match(/Your current balance is 30, but that costs 50.<\/detail>/)
       }
@@ -73,7 +73,7 @@ describe('API Problem reporting XML', () => {
       if (e instanceof FetchError) {
         const err: FetchErrorWithXML = e
         expect(err.status).to.equal(403)
-        expect(err.statusMessage).to.equal('response-codes:_403: Test access denied!')
+        expect(err.statusMessage).to.equal('Forbidden')
         const errBody = await err.data!.text()
         expect(errBody).to.match(/Test access denied!<\/title>/)
       }
@@ -86,7 +86,7 @@ describe('API Problem reporting XML', () => {
       if (e instanceof FetchError) {
         const err: FetchErrorWithXML = e
         expect(err.status).to.equal(403)
-        expect(err.statusMessage).to.equal('https://tools.ietf.org/html/rfc7231#section-6/_403: Test access denied!')
+        expect(err.statusMessage).to.equal('Forbidden')
         const errBody = await err.data!.text()
         expect(errBody).to.match(/Test access denied!<\/title>/)
       }
@@ -99,7 +99,7 @@ describe('API Problem reporting XML', () => {
       if (e instanceof FetchError) {
         const err: FetchErrorWithXML = e
         expect(err.status).to.equal(500)
-        expect(err.statusMessage).to.match(/http:\/\/www.w3.org\/2005\/xqt-errors\/FORG0001: Cannot convert (xs:string )?to xs:integer: "?ABCD"?./)
+        expect(err.statusMessage).to.equal("Server Error")
         const errBody = await err.data!.text()
         expect(errBody).to.match(/"?ABCD"?.<\/title>/)
       }
@@ -112,7 +112,7 @@ describe('API Problem reporting XML', () => {
       if (e instanceof FetchError) {
         const err: FetchErrorWithXML = e
         expect(err.status).to.equal(500)
-        expect(err.statusMessage).to.equal('_:an-error: testError Test1 Test2 Test3')
+        expect(err.statusMessage).to.equal('Server Error')
         const errBody = await err.data!.text()
         expect(errBody).to.match(/testError Test1 Test2 Test3<\/title>/)
       }
@@ -125,7 +125,7 @@ describe('API Problem reporting XML', () => {
       if (e instanceof FetchError) {
         const err: FetchErrorWithXML = e
         expect(err.status).to.equal(500)
-        expect(err.statusMessage).to.match(/err:FORG0001 > _:catch-and-error: Cannot convert (xs:string )?to xs:integer: "?ABCD"?. > Catch and error/)
+        expect(err.statusMessage).to.equal("Server Error")
         const errBody = await err.data!.text()
         expect(errBody).to.match(/Catch and error<\/title>/)
       }
@@ -135,9 +135,9 @@ describe('API Problem reporting XML', () => {
     try {
       const res = await ofetch.raw('/api-problem-tests/test9', { baseURL, method: "GET", redirect: 'manual' })
       expect(res.status).to.equal(302)
-      expect(res.statusText).to.equal('response-codes:_302: Moved Temporarily')
+      expect(res.statusText).to.equal('Found')
       const fwdBody = await res._data.text()
-      expect(fwdBody).to.match(/_302: Moved Temporarily<\/title>/)
+      expect(fwdBody).to.match(/_302: Found<\/title>/)
     } catch (err) {
       if (err instanceof FetchError)
         expect(err).to.be.undefined("No error expected")
@@ -151,7 +151,7 @@ describe('API Problem reporting XML', () => {
       if (e instanceof FetchError) {
         const err: FetchErrorWithXML = e
         expect(err.status).to.equal(404)
-        expect(err.statusMessage).to.equal('https://tools.ietf.org/html/rfc7231#section-6/_404: Not Found')
+        expect(err.statusMessage).to.equal('Not Found')
         const errBody = await err.data!.text()
         expect(errBody).to.match(/_404: Not Found<\/title>/)
       }
@@ -164,7 +164,7 @@ describe('API Problem reporting XML', () => {
       if (e instanceof FetchError) {
         const err: FetchErrorWithXML = e
         expect(err.status).to.equal(403)
-        expect(err.statusMessage).to.equal('https://tools.ietf.org/html/rfc7231#section-6/_403: Forbidden')
+        expect(err.statusMessage).to.equal('Forbidden')
         const errBody = await err.data!.text()
         expect(errBody).to.match(/_403: Forbidden<\/title>/)
       }
@@ -177,7 +177,7 @@ describe('API Problem reporting XML', () => {
       if (e instanceof FetchError) {
         const err: FetchErrorWithXML = e
         expect(err.status).to.equal(401)
-        expect(err.statusMessage).to.equal('https://tools.ietf.org/html/rfc7231#section-6/_401: Unauthorized')
+        expect(err.statusMessage).to.equal('Unauthorized')
         const errBody = await err.data!.text()
         expect(errBody).to.match(/_401: Unauthorized<\/title>/)
       }
@@ -195,7 +195,7 @@ describe('API Problem reporting JSON', () => {
         const err: FetchErrorWithApiProlem = e
         expect(err.status).to.equal(500)
         expect(err.response!.headers.get('content-type')).to.match(/\/problem\+json/)
-        expect(err.statusMessage).to.equal('_:an-error: testError Test1 Test2 Test3')
+        expect(err.statusMessage).to.equal('Server Error')
         const apiProblem = ApiProblem.parse(err.data)
         expect(apiProblem.title).to.match(/testError Test1 Test2 Test3/)
       }
@@ -232,7 +232,7 @@ describe('API Problem reporting JSON', () => {
         const err: FetchErrorWithApiProlem = e
         expect(err.status).to.equal(402)
         expect(err.response!.headers.get('content-type')).to.match(/\/problem\+json/)
-        expect(err.statusMessage).to.equal('You do not have enough credit.')
+        expect(err.statusMessage).to.equal('Payment Required')
         const apiProblem = ApiProblem.parse(err.data)
         expect(apiProblem.detail).to.match(/Your current balance is 30, but that costs 50./)
       }
@@ -246,7 +246,7 @@ describe('API Problem reporting JSON', () => {
         const err: FetchErrorWithApiProlem = e
         expect(err.status).to.equal(403)
         expect(err.response!.headers.get('content-type')).to.match(/\/problem\+json/)
-        expect(err.statusMessage).to.equal('response-codes:_403: Test access denied!')
+        expect(err.statusMessage).to.equal('Forbidden')
         const apiProblem = ApiProblem.parse(err.data)
         expect(apiProblem.title).to.match(/Test access denied!/)
         expect(apiProblem.trace).to.match(/api-problem.xqm/)
@@ -261,7 +261,7 @@ describe('API Problem reporting JSON', () => {
         const err: FetchErrorWithApiProlem = e
         expect(err.status).to.equal(403)
         expect(err.response!.headers.get('content-type')).to.match(/\/problem\+json/)
-        expect(err.statusMessage).to.equal('https://tools.ietf.org/html/rfc7231#section-6/_403: Test access denied!')
+        expect(err.statusMessage).to.equal('Forbidden')
         const apiProblem = ApiProblem.parse(err.data)
         expect(apiProblem.title).to.match(/Test access denied!/)
         expect(apiProblem.trace).to.not.match(/api-problem.xqm/)
@@ -276,7 +276,7 @@ describe('API Problem reporting JSON', () => {
         const err: FetchErrorWithApiProlem = e
         expect(err.status).to.equal(500)
         expect(err.response!.headers.get('content-type')).to.match(/\/problem\+json/)
-        expect(err.statusMessage).to.match(/http:\/\/www.w3.org\/2005\/xqt-errors\/FORG0001: Cannot convert (xs:string )?to xs:integer: "?ABCD"?./)
+        expect(err.statusMessage).to.equals('Server Error')
         const apiProblem = ApiProblem.parse(err.data)
         expect(apiProblem.title).to.match(/"?ABCD"?/)
       }
@@ -290,7 +290,7 @@ describe('API Problem reporting JSON', () => {
         const err: FetchErrorWithApiProlem = e
         expect(err.status).to.equal(500)
         expect(err.response!.headers.get('content-type')).to.match(/\/problem\+json/)
-        expect(err.statusMessage).to.equal('_:an-error: testError Test1 Test2 Test3')
+        expect(err.statusMessage).to.equal('Server Error')
         const apiProblem = ApiProblem.parse(err.data)
         expect(apiProblem.title).to.match(/testError Test1 Test2 Test3/)
       }
@@ -299,11 +299,13 @@ describe('API Problem reporting JSON', () => {
   it('should run test8', async () => {
     try {
       await ofetch.raw('/api-problem-tests/test8', { baseURL, method: "GET", headers: { accept: "application/json" } })
-    } catch (err) {
-      expect(err.status).to.equal(500)
-      expect(err.statusMessage).to.match(/err:FORG0001 > _:catch-and-error: Cannot convert (xs:string )?to xs:integer: "?ABCD"?. > Catch and error/)
-      const apiProblem = ApiProblem.parse(err.data)
-      expect(apiProblem.title).to.match(/Catch and error/)
+    } catch (e) {
+      if (e instanceof FetchError) {
+        expect(e.status).to.equal(500)
+        expect(e.statusMessage).to.equals("Server Error")
+        const apiProblem = ApiProblem.parse(e.data)
+        expect(apiProblem.title).to.match(/Catch and error/)
+      }
     }
   })
   it('should run test9', async () => {
@@ -311,9 +313,9 @@ describe('API Problem reporting JSON', () => {
       const res = await ofetch.raw('/api-problem-tests/test9', { baseURL, method: "GET", headers: { accept: "application/json" }, redirect: 'manual' })
       expect(res.status).to.equal(302)
       expect(res.headers.get('content-type')).to.match(/\/problem\+json/)
-      expect(res.statusText).to.equal('response-codes:_302: Moved Temporarily')
+      expect(res.statusText).to.equal('Found')
       const apiProblem = ApiProblem.parse(res._data)
-      expect(apiProblem.title).to.match(/_302: Moved Temporarily/)
+      expect(apiProblem.title).to.match(/_302: Found/)
     } catch (err) {
       if (err instanceof FetchError)
         expect(err).to.be.undefined("No error expected")
@@ -328,7 +330,7 @@ describe('API Problem reporting JSON', () => {
         const err: FetchErrorWithApiProlem = e
         expect(err.status).to.equal(404)
         expect(err.response!.headers.get('content-type')).to.match(/\/problem\+json/)
-        expect(err.statusMessage).to.equal('https://tools.ietf.org/html/rfc7231#section-6/_404: Not Found')
+        expect(err.statusMessage).to.equal('Not Found')
         const apiProblem = ApiProblem.parse(err.data)
         expect(apiProblem.title).to.match(/_404: Not Found/)
       }
@@ -342,7 +344,7 @@ describe('API Problem reporting JSON', () => {
         const err: FetchErrorWithApiProlem = e
         expect(err.status).to.equal(403)
         expect(err.response!.headers.get('content-type')).to.match(/\/problem\+json/)
-        expect(err.statusMessage).to.equal('https://tools.ietf.org/html/rfc7231#section-6/_403: Forbidden')
+        expect(err.statusMessage).to.equal('Forbidden')
         const apiProblem = ApiProblem.parse(err.data)
         expect(apiProblem.title).to.match(/_403: Forbidden/)
       }
@@ -356,7 +358,7 @@ describe('API Problem reporting JSON', () => {
         const err: FetchErrorWithApiProlem = e
         expect(err.status).to.equal(401)
         expect(err.response!.headers.get('content-type')).to.match(/\/problem\+json/)
-        expect(err.statusMessage).to.equal('https://tools.ietf.org/html/rfc7231#section-6/_401: Unauthorized')
+        expect(err.statusMessage).to.equal('Unauthorized')
         const apiProblem = ApiProblem.parse(err.data)
         expect(apiProblem.title).to.match(/_401: Unauthorized/)
       }
