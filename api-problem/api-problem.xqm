@@ -46,7 +46,12 @@ declare function _:or_result($start-time-ns as xs:integer, $api-function as func
           )
     } catch * {
         let $value-if-map := if ($err:value instance of map(*)) then $err:value else map {}
-        return _:problem-from-catch-vars($start-time-ns, $err:code, $err:description, $err:value, $err:module, $err:line-number, $err:column-number, if (not(empty($err:additional))) then string-join($err:additional, '&#x0a;') else "removed in BaseX 10.7", map:merge(($value-if-map($_:ADDITIONAL_HEADER_ELEMENTS), $header-elements)))
+        return _:problem-from-catch-vars($start-time-ns, $err:code, $err:description, $err:value, 
+                  $err:module, $err:line-number, $err:column-number,
+                  if (not(empty($err:additional))) then string-join($err:additional, '&#x0a;')
+                  else if ($err:stack-trace) then '&#x0a;'||$err:stack-trace
+                  else "&#x0a;details removed in BaseX 10.7",
+                  map:merge(($value-if-map($_:ADDITIONAL_HEADER_ELEMENTS), $header-elements)))
     }
 };
 
@@ -204,7 +209,8 @@ declare
   %rest:error-param("line-number", "{$line-number}")
   %rest:error-param("column-number", "{$column-number}")
   %rest:error-param("additional", "{$additional}")
-function _:error-handler($code as xs:string, $description, $value, $module, $line-number, $column-number, $additional) as item()+ {
+  %rest:error-param("stack-trace", "{$stack-trace}")
+function _:error-handler($code, $description, $value, $module, $line-number, $column-number, $additional, $stack-trace) as item()+ {
         let $start-time-ns := prof:current-ns(),
             $additional := string-join($additional, '&#x0a;'),
             $origin := try { req:header("Origin") } catch basex:http {'urn:local'},
@@ -232,7 +238,8 @@ function _:error-handler($code as xs:string, $description, $value, $module, $lin
                     <detail>{$value}</detail>
                     <instance>{$instance}</instance>
                     <status>{$status-code}</status>
-                    {if ($_:enable_trace) then <trace xml:space="preserve">{replace(replace($additional, '^.*Stopped at ', '', 's'), ':\n.*($|(\n\nStack Trace:(\n)))', '$3')}</trace> else ()}
+                    {if ($_:enable_trace and $additional) then <trace xml:space="preserve">{replace(replace($additional, '^.*Stopped at ', '', 's'), ':\n.*($|(\n\nStack Trace:(\n)))', '$3')}</trace> else ()}
+                    {if ($_:enable_trace and $stack-trace) then <trace xml:space="preserve">{$stack-trace}</trace> else ()}
                 </problem>, if (exists($origin)) then map{"Access-Control-Allow-Origin": $origin,
                           "Access-Control-Allow-Credentials": "true"} else ())  
 };
